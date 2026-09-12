@@ -189,7 +189,7 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
           await gh.createComment(ledger.number, formatEntry({ ...iou, status: "settled", settled_by: `PR #${pr.number}`, reason }));
           // If a tracking issue was filed for this promise, say so there too — but do NOT close
           // it. Closing is a judgement about someone else's work; the bot reports, the human
-          // closes. It also keeps the adapter at eight operations. See DECISIONS.md.
+          // closes. It also keeps the adapter at eight operations.
           if (iou.issue_url) {
             const n = Number(iou.issue_url.split("/").pop());
             if (Number.isInteger(n)) {

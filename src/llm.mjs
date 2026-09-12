@@ -102,7 +102,8 @@ function askCli(userText, system, timeoutMs) {
   const env = { ...process.env };
   delete env.CLAUDECODE; // the CLI refuses to nest inside a Claude Code session otherwise
   // Node sets these inside every `node --test` worker and the live e2e runs there, so the child
-  // inherits them. Hygiene, not a fix — measured, and they do not cause the hang in BLOCKED.md.
+  // inherits them. Hygiene, not a fix — measured, and not the cause of the CLI timeouts that
+  // LIMITATIONS.md describes.
   delete env.NODE_TEST_CONTEXT;
   delete env.NODE_TEST_WORKER_ID;
   return new Promise((resolve, reject) => {

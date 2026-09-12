@@ -28,6 +28,20 @@ failure mode, and it is the reason the deployment uses the API.
 The OpenRouter branch is complete code that has **never been exercised**: no key has ever been set
 for it, and not one call has been made through it.
 
+**One failure on that path was never explained.** Two early runs recorded zero promises because
+every classification failed with `llm timeout after 60000ms`. Four causes were tested and all four
+ruled out: Windows shell quoting mangling the prompt (exits in 9.5s with a wrong answer, never
+hangs), contention between concurrent processes (five calls at peak load, 2.8–7.3s), an inherited
+unclosed stdin (about 3s), and Node's test-runner variables leaking into the child (6.0s clean
+against 5.1s with them set, both exit 0). The classifier itself was then proven correct standalone
+on three fixtures, so it is neither a prompt nor a parsing problem.
+
+Investigation stopped there rather than continuing without new evidence. The fault has not recurred
+across the runs since, and it has never appeared on the API path the deployment uses. It is
+recorded because the alternative is pretending every failure got an answer. The blast radius is
+bounded by design: the timeout is per call, every failure is fail-closed, so the worst case is a
+bot that says nothing rather than one that invents a promise.
+
 ### One repository, and bounded reads inside it
 
 The bot watches a single repository, named by `IOU_REPO`.

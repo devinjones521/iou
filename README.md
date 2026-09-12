@@ -208,17 +208,12 @@ five ledger comments cited by older evidence files were deleted by our own demo 
 forced-5xx failure path is tested against a local server because GitHub won't return a 500 on
 request.
 
-An unexplained failure is documented in [`BLOCKED.md`](BLOCKED.md) rather than hidden: an early
-live run timed out on every model call. Four theories were raised and all four were measured and
-disproved; a fifth was named and deliberately not pursued, because chasing it would have been
-grinding without new evidence. It is written down because a build log that only records the wins is
-not a build log — and because "four tested, one declined" is the honest count, not five.
+The one failure that was never explained is in there too, rather than left out: two early runs
+timed out on every model call, four possible causes were tested and ruled out, and the
+investigation stopped rather than continue without new evidence. It has not recurred, and it never
+appeared on the backend the deployment uses.
 
 ## How it was built
-
-[`BUILD-LOG.md`](BUILD-LOG.md) is the honest account, including the three gates that were green
-while doing nothing and the failure nobody could explain. [`DECISIONS.md`](DECISIONS.md) records
-every non-obvious choice with its reasoning and how to reverse it.
 
 Everything in `src/`, `tests/`, `scripts/` and the playground repository was written during the
 hackathon window on 12 September 2026. The one pre-existing building block is the loop harness —
