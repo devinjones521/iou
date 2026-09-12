@@ -17,18 +17,26 @@ const MARK = /<!--\s*iou\s+(\{[\s\S]*?\})\s*-->/;
  * a SECOND one. Two ledgers means the bot's memory splits across them and promises fall down the
  * gap. Once the number is known we never list again, which also saves an API call every tick.
  *
- * If several labelled issues already exist (from exactly that bug), take the OLDEST — it is the
- * one with the history — and say so, rather than silently picking whichever the API returned first.
+ * If several labelled issues already exist (from exactly that bug), take the one with the MOST
+ * entries and say so. "Oldest" is the obvious rule and it is wrong: in the race that produced
+ * this, the first issue was created and then the tick ended, so the SECOND one is the one that
+ * accumulated the history. Picking by age would have silently adopted an empty ledger and
+ * abandoned every promise recorded in the other — a memory loss that looks like normal operation.
+ * Age is only the tie-break.
  */
 export async function ensureLedger(gh, log, remembered = null) {
   if (remembered) return { number: remembered, html_url: null, remembered: true };
 
   const issues = (await gh.listIssues({ labels: LEDGER_LABEL, state: "all" })).filter((i) => !i.pull_request);
   if (issues.length > 1) {
-    const oldest = issues.reduce((a, b) => (a.created_at <= b.created_at ? a : b));
-    log(`WARNING: ${issues.length} issues labelled ${LEDGER_LABEL}. Using the oldest (#${oldest.number}); ` +
-        `close the others by hand: ${issues.filter((i) => i.number !== oldest.number).map((i) => "#" + i.number).join(", ")}`);
-    return oldest;
+    const best = issues.reduce((a, b) => {
+      const ca = a.comments ?? 0, cb = b.comments ?? 0;
+      if (ca !== cb) return ca > cb ? a : b;
+      return a.created_at <= b.created_at ? a : b;
+    });
+    log(`WARNING: ${issues.length} issues labelled ${LEDGER_LABEL}. Using #${best.number} (${best.comments ?? 0} entries); ` +
+        `close the others by hand: ${issues.filter((i) => i.number !== best.number).map((i) => "#" + i.number).join(", ")}`);
+    return best;
   }
   if (issues.length === 1) return issues[0];
 

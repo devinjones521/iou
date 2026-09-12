@@ -122,19 +122,33 @@ test("ensureLedger never creates a second ledger once the number is known", asyn
   assert.deepEqual(calls, ["list", "create"], "a remembered ledger must cause NO further API calls");
 });
 
-test("ensureLedger picks the OLDEST when duplicates already exist, and says so", async () => {
+test("ensureLedger picks the ledger with the ENTRIES, not the oldest, and says so", async () => {
+  // These are the real numbers from the race. #50 was created first and stayed EMPTY; the tick
+  // that created #51 is the one that then wrote to it. "Use the oldest" is the obvious rule and
+  // it would silently adopt the empty one and abandon every promise in the other.
   const warnings = [];
   const gh = {
     listIssues: async () => ([
-      { number: 51, created_at: "2026-09-12T12:51:24Z" },
-      { number: 50, created_at: "2026-09-12T12:51:17Z" },
+      { number: 51, created_at: "2026-09-12T12:51:24Z", comments: 3 },
+      { number: 50, created_at: "2026-09-12T12:51:17Z", comments: 0 },
     ]),
     createIssue: async () => { throw new Error("must not create when ledgers already exist"); },
   };
   const led = await ensureLedger(gh, (m) => warnings.push(m), null);
-  assert.equal(led.number, 50, "the oldest holds the history");
+  assert.equal(led.number, 51, "the ledger with entries holds the history, regardless of age");
   assert.match(warnings.join("\n"), /2 issues labelled iou-ledger/);
-  assert.match(warnings.join("\n"), /#51/, "it must name the duplicates so a human can close them");
+  assert.match(warnings.join("\n"), /#50/, "it must name the strays so a human can close them");
+});
+
+test("ensureLedger falls back to age only when entry counts tie", async () => {
+  const gh = {
+    listIssues: async () => ([
+      { number: 9, created_at: "2026-09-12T13:00:00Z", comments: 0 },
+      { number: 7, created_at: "2026-09-12T12:00:00Z", comments: 0 },
+    ]),
+    createIssue: async () => { throw new Error("must not create"); },
+  };
+  assert.equal((await ensureLedger(gh, () => {}, null)).number, 7);
 });
 
 test("ledger: a settled entry reads as kept, not as filed", () => {
