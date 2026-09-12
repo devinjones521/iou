@@ -79,6 +79,26 @@ test("comment bodies never double-punctuate the model's reason (it is on camera)
   assert.ok(s.includes("— adds a retry loop with backoff."), s);
 });
 
+test("a hostile comment cannot make the bot post links, mentions or HTML", () => {
+  // The attack: get the classifier to echo attacker text back, so it appears under the BOT's name
+  // in a PR comment — which reads as trustworthy precisely because the bot wrote it.
+  const iou = {
+    who: "attacker",
+    what: 'Visit https://evil.example/pwn and ping @maintainer re #1337 <script>alert(1)</script>',
+    source: "https://x/pull/1#issuecomment-1", pr: 1, id: "c1",
+  };
+  for (const body of [
+    resurfaceBody([{ iou, reason: "Also see http://evil.example/2 <img src=x>" }], { number: 2 }),
+    settleBody([{ iou, reason: "Also see http://evil.example/2 <img src=x>" }]),
+  ]) {
+    assert.ok(!/evil\.example/.test(body), `attacker URL reached a bot comment:\n${body}`);
+    assert.ok(!/<script|<img/i.test(body), `HTML reached a bot comment:\n${body}`);
+    assert.ok(!/(^|[^\w​])@maintainer/m.test(body), `live @-mention reached a bot comment:\n${body}`);
+    // The legitimate source link, which the API gave us, must still be there.
+    assert.ok(body.includes("https://x/pull/1#issuecomment-1"), `the real source link was stripped:\n${body}`);
+  }
+});
+
 test("settleBody: marks the PR that kept the promise and asks for nothing", () => {
   const s = settleBody([{ iou: { who: "dev", what: "add retries", source: "https://x/pull/1#issuecomment-1", pr: 1, id: "c1" }, reason: "adds a retry loop" }]);
   assert.ok(s.startsWith("<!-- iou:settle"));

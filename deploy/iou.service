@@ -1,0 +1,75 @@
+# systemd unit for the IOU bot.
+#
+# Security shape, stated plainly because it is the reason this is safe to leave running:
+#
+#   * NO INBOUND NETWORK. The bot polls GitHub outbound and listens on nothing. There is no port,
+#     no web server, no webhook endpoint. Hosting it adds zero remotely-reachable attack surface
+#     to the box — an attacker cannot reach the bot at all, only the repository it watches.
+#   * Runs as a dedicated unshelled user that owns nothing else on the machine.
+#   * The two secrets (Anthropic API key, GitHub App private key) live in /etc/iou/, mode 600,
+#     readable only by that user. Both are scoped and revocable: the API key is dedicated to this
+#     deployment, and the GitHub App is installed on ONE repository with contents:read only — it
+#     cannot push code anywhere, including to the repo it watches.
+#   * Spend ceilings live in the code (src/budget.mjs), so a hostile actor hammering the watched
+#     repository hits a per-actor hourly cap, a per-tick cap and a lifetime cap, and then the bot
+#     simply goes quiet. Set a spend limit on the API key in the console as the final backstop.
+
+[Unit]
+Description=IOU — remembers promises made in pull-request reviews
+Documentation=https://github.com/devinjones521/iou
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=iou
+Group=iou
+WorkingDirectory=/opt/iou
+EnvironmentFile=/etc/iou/iou.env
+ExecStart=/usr/bin/node src/watch.mjs
+Restart=always
+RestartSec=10
+
+# Crash-loop brake: if it fails 5 times in 5 minutes, stop rather than hammer the API.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Hardening. The bot reads its code and writes one state directory; it needs nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Outbound only, and only over IP. The bot talks to api.github.com and api.anthropic.com.
+RestrictAddressFamilies=AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=0.0.0.0/0 ::/0
+
+# The only writable path: where the cursor, handled-comment ids and spend ledger live.
+ReadWritePaths=/opt/iou/.iou
+
+MemoryMax=512M
+TasksMax=64
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=iou
+
+[Install]
+WantedBy=multi-user.target

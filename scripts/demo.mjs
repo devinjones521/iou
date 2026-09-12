@@ -17,7 +17,9 @@ import { execFileSync } from "node:child_process";
 import { github, resolveAuth } from "../src/github.mjs";
 import { tick } from "../src/tick.mjs";
 import { human } from "../tests/helpers/gh.mjs";
-import { repoFromEnv, stamp } from "../src/util.mjs";
+import { loadDotEnv, repoFromEnv, stamp } from "../src/util.mjs";
+
+loadDotEnv();
 
 const { owner, repo } = repoFromEnv();
 const log = (m) => console.log(`${stamp()} ${m}`);

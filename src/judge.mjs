@@ -32,8 +32,8 @@ export async function judgeFulfilment(iou, files) {
     .join("\n\n")
     .slice(0, 12000);
   const user = `Promise by @${iou.who}: ${iou.what}\nMentioned paths: ${iou.paths.join(", ") || "none"}; symbols: ${iou.symbols.join(", ") || "none"}\n\nDiff:\n${patches}`;
-  const { json, raw, ms, cost } = await askJson(user, { system: SYSTEM });
-  return { verdict: fulfilmentFrom(json), raw, ms, cost };
+  const { json, raw, ms, cost, usage } = await askJson(user, { system: SYSTEM });
+  return { verdict: fulfilmentFrom(json), raw, ms, cost, usage };
 }
 
 /** Pure, testable. Returns {fulfils, reason} or null when the model output is unusable. */

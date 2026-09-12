@@ -16,7 +16,9 @@ import { github, resolveAuth } from "../src/github.mjs";
 import { tick } from "../src/tick.mjs";
 import { LEDGER_LABEL, reduceLedger } from "../src/ledger.mjs";
 import { human } from "./helpers/gh.mjs";
-import { repoFromEnv } from "../src/util.mjs";
+import { loadDotEnv, repoFromEnv } from "../src/util.mjs";
+
+loadDotEnv();
 
 const { owner, repo } = repoFromEnv();
 const stampId = new Date().toISOString().replace(/[:.]/g, "-");

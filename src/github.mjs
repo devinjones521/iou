@@ -11,6 +11,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { createSign } from "node:crypto";
+import { loadDotEnv } from "./util.mjs";
 
 export const OPERATIONS = Object.freeze([
   "listIssues",          // GET  /repos/{o}/{r}/issues?labels=&state=
@@ -29,7 +30,7 @@ const RETRYABLE = new Set([500, 502, 503, 504, 429]);
 /** Token precedence: explicit → env → GitHub App (.env) → `gh auth token`. Never logged. */
 export async function resolveAuth(env = process.env) {
   if (env.GITHUB_TOKEN) return { token: env.GITHUB_TOKEN, kind: "token" };
-  loadDotEnv(env);
+  loadDotEnv(".env", env);
   if (env.IOU_APP_ID && env.IOU_INSTALLATION_ID && env.IOU_APP_PEM && existsSync(env.IOU_APP_PEM)) {
     const token = await installationToken(env.IOU_APP_ID, env.IOU_INSTALLATION_ID, readFileSync(env.IOU_APP_PEM, "utf8"));
     return { token, kind: "app" };
@@ -39,13 +40,6 @@ export async function resolveAuth(env = process.env) {
   return { token: out, kind: "gh" };
 }
 
-function loadDotEnv(env) {
-  if (!existsSync(".env")) return;
-  for (const line of readFileSync(".env", "utf8").split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-    if (m && !(m[1] in env)) env[m[1]] = m[2].replace(/^["']|["']$/g, "");
-  }
-}
 
 /** Mint a short-lived installation token from a GitHub App private key (RS256 JWT). */
 async function installationToken(appId, installationId, pem) {

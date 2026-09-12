@@ -14,5 +14,8 @@
     "demo": "node scripts/demo.mjs",
     "tick": "node -e \"import('./src/github.mjs').then(async ({github,resolveAuth})=>{const {tick}=await import('./src/tick.mjs');const {repoFromEnv,stamp}=await import('./src/util.mjs');const {owner,repo}=repoFromEnv();const a=await resolveAuth();await tick(github({owner,repo,token:a.token,log:(m)=>console.log(stamp()+' '+m)}),{log:(m)=>console.log(stamp()+' '+m)})})\"",
     "watch": "node src/watch.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0"
   }
 }

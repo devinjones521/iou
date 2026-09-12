@@ -13,13 +13,17 @@ import { judgeFulfilment, touchedIous } from "./judge.mjs";
 import { ensureLedger, formatEntry, openIous, outstandingIous, reduceLedger } from "./ledger.mjs";
 import { loadState, remember, saveState } from "./state.mjs";
 import { GitHubError } from "./github.mjs";
+import { openBudget, sanitise } from "./budget.mjs";
 
 export const MARK_RESURFACE = "<!-- iou:resurface";
 
-export async function tick(gh, { log = console.log, botLogin = process.env.IOU_BOT_LOGIN || null, statePath, now = () => new Date() } = {}) {
+export async function tick(gh, { log = console.log, botLogin = process.env.IOU_BOT_LOGIN || null, statePath, budgetPath, now = () => new Date() } = {}) {
   const startedAt = now().toISOString();
   const state = loadState(statePath);
-  const summary = { recorded: [], resurfaced: [], settled: [], silent: [], filed: [], dropped: [], errors: [] };
+  // Every model call in this tick passes through here first. Triggers come from strangers on a
+  // public repository, so the ceilings are the difference between a demo and an open bill.
+  const budget = openBudget(budgetPath);
+  const summary = { recorded: [], resurfaced: [], settled: [], silent: [], filed: [], dropped: [], skipped: [], errors: [] };
   const isBot = (login) => botLogin ? login === botLogin : false;
   // Recognise our own output by its marker as well as by author. IOU_BOT_LOGIN may be unset
   // (no GitHub App), and without this the bot reads its own comments back as human promises.
@@ -56,12 +60,21 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
   if (fresh.length === 0) log(`wake: no new comments since ${state.cursor}`);
   for (const c of fresh) {
     log(`wake: comment ${c.id} on PR #${c.prNumber} by @${c.user.login} (${c.kind})`);
+    const denied = budget.check(c.user.login);
+    if (denied) {
+      // Deliberately NOT marked handled: the comment is skipped for now, not judged and dismissed.
+      // When the hour rolls over or the operator raises the ceiling, it gets its fair look.
+      log(`  SKIPPED without spending: ${denied}`);
+      summary.skipped.push({ comment: c.id, actor: c.user.login, reason: denied });
+      continue;
+    }
     remember(state.handledComments, c.id);
     try {
-      const { verdict, ms } = await classifyComment({ body: c.body, author: c.user.login, path: c.path || null });
+      const { verdict, ms, usage } = await classifyComment({ body: c.body, author: c.user.login, path: c.path || null });
+      budget.spend(c.user.login, usage);
       if (!verdict) { log(`  not a promise (${ms} ms)`); continue; }
       const record = {
-        id: `c${c.id}`, status: "open", who: c.user.login, what: verdict.what,
+        id: `c${c.id}`, status: "open", who: c.user.login, what: sanitise(verdict.what),
         paths: verdict.paths, symbols: verdict.symbols, confidence: verdict.confidence,
         source: c.html_url, pr: c.prNumber, recorded_at: startedAt,
       };
@@ -106,8 +119,11 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
     const unkept = [];
     const kept = [];
     for (const iou of touched) {
+      const denied = budget.check(pr.user?.login || "unknown");
+      if (denied) { log(`PR #${pr.number}: SKIPPED without spending: ${denied}`); summary.skipped.push({ pr: pr.number, reason: denied }); continue; }
       try {
-        const { verdict, ms } = await judgeFulfilment(iou, files);
+        const { verdict, ms, usage } = await judgeFulfilment(iou, files);
+        budget.spend(pr.user?.login || "unknown", usage);
         if (!verdict) { log(`PR #${pr.number}: cannot tell whether "${iou.what}" is kept — silent (${ms} ms)`); continue; }
         if (verdict.fulfils) {
           log(`PR #${pr.number}: KEEPS "${iou.what}" — ${verdict.reason} (${ms} ms)`);
@@ -189,7 +205,7 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
       try {
         if (decided === "+1") {
           const issue = await gh.createIssue({
-            title: `IOU: ${iou.what}`,
+            title: `IOU: ${sanitise(iou.what, 120)}`,
             labels: ["iou"],
             assignees: [iou.who],
             body: [
@@ -217,6 +233,9 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
 
   state.cursor = startedAt;
   saveState(state, statePath);
+  budget.save();
+  if (budget.spentThisTick) log(`tick spent ${budget.spentThisTick} model call(s); ${budget.remaining} left of the lifetime budget`);
+  summary.budget = { spentThisTick: budget.spentThisTick, spentTotal: budget.spentTotal, remaining: budget.remaining, tokens: budget.tokens };
   return summary;
 }
 
@@ -228,9 +247,13 @@ function degrade(err, stage, summary, log, state, statePath) {
   return summary;
 }
 
-/** Model reasons arrive capitalised and sometimes end-stopped; this text is on camera. */
+/**
+ * The judge's reason is model output derived from a stranger's diff and is about to be posted
+ * under the bot's name, so it is sanitised like any other untrusted text. It also arrives
+ * capitalised and end-stopped, and gets spliced mid-sentence — this text is on camera.
+ */
 function tidyReason(reason) {
-  const r = String(reason || "").trim().replace(/\s*\.\s*$/, "");
+  const r = sanitise(reason, 240).replace(/\s*\.\s*$/, "");
   if (!r) return "";
   return r[0].toLowerCase() + r.slice(1);
 }
@@ -238,7 +261,7 @@ function tidyReason(reason) {
 export function resurfaceBody(unkept, pr) {
   const lines = unkept.map(({ iou, reason }) => {
     const why = tidyReason(reason);
-    return `- **@${iou.who} promised:** ${iou.what} ([where](${iou.source}), PR #${iou.pr}).\n  This PR touches that code but doesn't do it${why ? ` — ${why}` : ""}.`;
+    return `- **@${iou.who} promised:** ${sanitise(iou.what)} ([where](${iou.source}), PR #${iou.pr}).\n  This PR touches that code but doesn't do it${why ? ` — ${why}` : ""}.`;
   });
   return [
     `${MARK_RESURFACE} ${JSON.stringify({ pr: pr.number, ious: unkept.map((u) => u.iou.id) })} -->`,
@@ -254,8 +277,8 @@ export const MARK_SETTLE = "<!-- iou:settle";
 
 export function settleBody(kept) {
   const lines = kept.map(({ iou, reason }) => {
-    const why = String(reason || "").trim().replace(/\s*\.\s*$/, "");
-    return `- **@${iou.who} promised:** ${iou.what} ([where](${iou.source}), PR #${iou.pr}).\n  This PR does it${why ? ` — ${why[0].toLowerCase() + why.slice(1)}` : ""}. Closed.`;
+    const why = tidyReason(reason);
+    return `- **@${iou.who} promised:** ${sanitise(iou.what)} ([where](${iou.source}), PR #${iou.pr}).\n  This PR does it${why ? ` — ${why}` : ""}. Closed.`;
   });
   return [
     `${MARK_SETTLE} ${JSON.stringify({ ious: kept.map((k) => k.iou.id) })} -->`,

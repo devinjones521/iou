@@ -86,28 +86,17 @@ the cap is enforced by a test, not by convention. A rule that isn't executed isn
 ## Setup
 
 ```bash
-npm install                 # no dependencies — Node 22+ only
+npm install                 # one dependency: the official Anthropic SDK. Node 22+.
 cp .env.example .env        # then fill in the values below
 npm run verify              # the fast gate: scoreboard, tests, adapter cap
 IOU_LIVE=1 npm run verify   # the same gate plus the full live end-to-end
 npm run watch               # run the bot against your repo
 ```
 
-To watch the whole story happen against a real repository, one beat at a time:
-
-```bash
-node scripts/demo.mjs reset
-node scripts/demo.mjs beat1   # a human promises something in a review thread
-node scripts/demo.mjs beat2   # the bot records it in the ledger
-node scripts/demo.mjs beat3   # an unrelated PR — the bot says nothing
-node scripts/demo.mjs beat4   # a PR that touches it — one comment
-node scripts/demo.mjs beat5   # 👍 — a tracking issue appears
-node scripts/demo.mjs beat6   # a PR that keeps the promise — settled
-```
-
 `.env`:
 
 ```
+ANTHROPIC_API_KEY=<a key used only for this>
 IOU_APP_ID=<your GitHub App id>
 IOU_INSTALLATION_ID=<the installation id>
 IOU_APP_PEM=./iou-app.pem
@@ -117,6 +106,74 @@ IOU_BOT_LOGIN=your-app-slug[bot]
 
 The App needs **Contents: read**, **Issues: write**, **Pull requests: write**. Note it cannot push
 code — by design.
+
+### The model backend
+
+A provider chain, first configured wins:
+
+| | When | Notes |
+|---|---|---|
+| **Anthropic API** | `ANTHROPIC_API_KEY` is set | The real backend. Deployable, and what you want. |
+| **OpenRouter** | `OPENROUTER_API_KEY` is set | For anyone without an Anthropic account. |
+| **Claude Code CLI** | neither is set | Local convenience only. Not deployable — it uses your own interactive login — and roughly 25x more expensive per call, because the CLI injects about 22,000 tokens of its own scaffolding into every request. |
+
+Cost is small enough to state exactly. A classification is about 420 tokens in and 80 out; a diff
+judgement about 1,600 in and 110 out. On Opus that is roughly $0.004 and $0.011; on Haiku, $0.0008
+and $0.002. Set `IOU_MODEL` to pick.
+
+**On identity federation.** Anthropic offers Workload Identity Federation, which removes the static
+key entirely by having your cloud or CI provider issue short-lived tokens. It is the better answer
+if you run IOU on GCP, AWS, Azure or GitHub Actions, and the SDK picks it up automatically once the
+federation environment variables are set. It does **not** apply to a plain VPS, which has no
+identity provider to federate against — Anthropic's own guidance says as much. Note that federation
+removes the risk of a key being *stolen*, not the risk of it being *used*: whatever can trigger the
+workload can still spend. That second risk is what the budget below is for.
+
+## Spend control, because the triggers come from strangers
+
+Anyone with a GitHub account can comment on a public repository, and every comment is a potential
+model call. IOU has three ceilings, all failing closed, all overridable by environment variable:
+
+| Ceiling | Default | Why |
+|---|---|---|
+| Per actor, per hour | 12 | A judge trying the bot needs a handful. Someone hammering it gets 12, then silence. |
+| Per tick | 20 | One enormous pull request, or a backlog, cannot drain the budget in a single pass. |
+| Lifetime | 2000 | The worst case is a known number, not an open-ended bill. Delete `.iou/budget.json` to reset. |
+
+Three details that matter more than the numbers:
+
+- **A failed call never consumes budget.** Spend is recorded after the model answers, not before, so
+  a credit failure or a network error costs nothing.
+- **A corrupt budget file reads as exhausted, not as zero spend.** The opposite would silently
+  remove the ceiling, which is the failure mode worth designing against.
+- **A comment denied by the budget is skipped, not marked handled.** It gets a fair look when the
+  hour rolls over rather than being quietly swallowed.
+
+This is deliberately **not** an allowlist. An allowlist would keep strangers out, and the entire
+point of running IOU in the open is that someone else can open a pull request and watch it answer.
+
+**Everything the bot posts under its own name is sanitised first** — links, HTML, `@`-mentions and
+issue cross-references are defused and the text is capped. The attack this closes is real: craft a
+comment that makes the classifier echo your text back, and you have content signed by the bot,
+which reads as trustworthy precisely because the bot wrote it.
+
+## Running it on a server
+
+`deploy/` has a systemd unit and an install script.
+
+The property that makes this safe is that **IOU listens on nothing**. It polls GitHub outbound and
+has no port, no web server and no webhook endpoint, so hosting it adds no remotely reachable attack
+surface. The unit runs it as a dedicated unshelled user with an empty capability set,
+`ProtectSystem=strict`, and exactly one writable directory.
+
+```bash
+sudo bash deploy/install.sh     # installs, creates a 0600 placeholder env file, and stops
+sudoedit /etc/iou/iou.env       # you fill in the secrets; the script never touches them
+sudo systemctl enable --now iou
+journalctl -u iou -f
+```
+
+To stop it spending anything ever again: `systemctl disable --now iou`, then revoke the key.
 
 ## Verification
 

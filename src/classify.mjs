@@ -26,8 +26,8 @@ export async function classifyComment({ body, author, path = null }) {
     String(body).slice(0, 4000),
     ">>>",
   ].join("\n");
-  const { json, raw, ms, cost } = await askJson(user, { system: SYSTEM });
-  return { verdict: verdictFrom(json, path), raw, ms, cost };
+  const { json, raw, ms, cost, usage } = await askJson(user, { system: SYSTEM });
+  return { verdict: verdictFrom(json, path), raw, ms, cost, usage };
 }
 
 /** Pure, testable: turns model JSON (or garbage) into a verdict. Null = not a promise. */

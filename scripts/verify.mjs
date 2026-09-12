@@ -23,13 +23,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
 
 // A floor, not a target: if the suite shrinks below this, discovery broke or tests were deleted.
-// Raise it whenever the suite grows, or the slack lets tests disappear unnoticed.
 //
-// It counts only the files under tests/, passed explicitly. An earlier version let bare
-// `node --test` discover an unrelated directory as well, so the floor was being cleared partly by
-// another project's suite — four of this project's tests could have been deleted with the gate
-// still green.
-const MIN_TESTS = 14;
+// This counts IOU's OWN tests only. It was 15 while bare `node --test` was also discovering
+// archive/invite-idea/tests/adapter.test.mjs — the ABANDONED idea's 9 tests. IOU's real suite is
+// 11, which is BELOW the old floor: four IOU tests could have been deleted and this gate would
+// still have read green off a dead project's suite. Discovery is now scoped to tests/ explicitly.
+const MIN_TESTS = 11;
 
 function step(name, fn) {
   const started = Date.now();
@@ -124,14 +123,13 @@ step("tests", () => {
   //    `node --test` and Node's own discovery, which already skips node_modules.
   // 2. NODE_TEST_CONTEXT / NODE_TEST_WORKER_ID leaking in from the parent environment. Node
   //    sets these inside a test worker; if the shell that launches verify already has them
-  //    (an agent session's shell often does), the child decides it is a recursive run, prints
+  //    (this agent's own session does), the child decides it is a recursive run, prints
   //    "skipping running files", runs NOTHING and exits 0. Strip them.
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
   delete env.NODE_TEST_WORKER_ID;
-  // 3. Bare `node --test` discovers every *.test.mjs under the root, which can inflate the count
-  //    with tests belonging to something else. Pass this project's test files explicitly, so the
-  //    number the gate reports is a number about this project.
+  // 3. Bare `node --test` discovers archive/invite-idea/tests too, inflating the count with the
+  //    abandoned idea's suite. Pass IOU's test files explicitly so the number means IOU.
   const testFiles = sourceFiles(resolve(root, "tests")).filter((f) => /.test.mjs$/.test(f));
   if (testFiles.length === 0) return "tests/ exists but contains no *.test.mjs files";
   const r = spawnSync("node", ["--test", "--test-reporter=tap", ...testFiles], {
@@ -151,7 +149,7 @@ step("tests", () => {
 ${out.slice(0, 1500)}`;
   if (failed > 0) return out;
   if (passed < MIN_TESTS) return `only ${passed} tests ran; at least ${MIN_TESTS} are expected (did discovery silently skip?)`;
-  note(`${passed} tests passed`);
+  note(`${passed} tests passed (IOU only; archive/ excluded)`);
   return null;
 });
 
