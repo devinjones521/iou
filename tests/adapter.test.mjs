@@ -138,3 +138,38 @@ test("a promise already in the ledger is not recorded again, and costs no model 
     server.close();
   }
 });
+
+/**
+ * Regression: a repo-wide list must be read to the end, not to the end of page one.
+ *
+ * `listIssueComments` is repo-wide and the ledger is an issue, so ledger entries share the page
+ * budget with every pull-request comment in the repository. Measured on the live playground at
+ * 105 comments: page one held 14 of the ledger's 16 entries and dropped the two NEWEST — the ones
+ * that decide current state. The bot reduced a stale ledger and went silent on a pull request it
+ * should have spoken about. Silence is this product's default, so the bug hid in plain sight.
+ */
+test("listIssueComments reads every page, not just the first", async () => {
+  const TOTAL = 105, PER = 100;
+  const pagesServed = [];
+  const server = createServer((req, res) => {
+    const u = new URL(req.url, "http://x");
+    const page = Number(u.searchParams.get("page") || 1);
+    const per = Number(u.searchParams.get("per_page") || PER);
+    pagesServed.push(page);
+    const start = (page - 1) * per;
+    const body = Array.from({ length: Math.max(0, Math.min(per, TOTAL - start)) },
+      (_, i) => ({ id: start + i, body: `c${start + i}`, issue_url: "http://x/repos/o/r/issues/67" }));
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(body));
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  try {
+    const gh = github({ owner: "o", repo: "r", token: "t", base: `http://127.0.0.1:${server.address().port}`, backoffMs: 1 });
+    const all = await gh.listIssueComments({ since: "2000-01-01T00:00:00Z" });
+    assert.equal(all.length, TOTAL, `must return all ${TOTAL}, got ${all.length} — the newest entries are the ones that get dropped`);
+    assert.deepEqual(pagesServed, [1, 2], "should stop as soon as a short page comes back");
+    assert.equal(all.at(-1).id, TOTAL - 1, "the LAST comment is the one that decides current ledger state");
+  } finally {
+    server.close();
+  }
+});

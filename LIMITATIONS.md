@@ -20,6 +20,24 @@ happened once during the build: a judgement call failed and the bot stayed silen
 guessing. That is the right failure mode, but throughput is bounded by whatever quota the backend
 has. Setting `ANTHROPIC_API_KEY` and swapping the single `ask` function removes the limit.
 
+### The repo-wide comment list is paged to exhaustion, and that was a correctness fix
+
+This entry used to say the bot reads one page of results, framed as a scale limit. Measured on the
+live playground it is a correctness bug, and the repository crossed the threshold during the build:
+105 issue comments against a page size of 100.
+
+`listIssueComments` is repo-wide and the ledger is an issue, so ledger entries compete for page
+space with every pull-request comment in the repository. Page one held 14 of the ledger's 16
+entries and dropped the two **newest** — the ones that decide current state. The bot reduced a
+stale ledger, concluded a promise was "already filed" when the ledger said open, and stayed silent
+on a pull request it should have spoken about.
+
+Silence is this product's default. That is exactly why a bug whose only symptom is silence sat
+unnoticed behind a line in this file. The list is now paged to exhaustion, capped at 10 pages, with
+the cap logged rather than swallowed. The remaining limit is genuinely scale: past 1000 issue
+comments the ledger needs fetching by issue number, which costs a ninth adapter operation and so
+requires a decision about the cap.
+
 ### One repository, one page of results
 
 The bot watches a single repository (`IOU_REPO`) and reads at most 100 comments and 50 pull

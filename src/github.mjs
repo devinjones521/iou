@@ -93,11 +93,37 @@ export function github({ owner, repo, token, base = API, log = () => {}, retries
   }
   const q = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => v != null)).toString();
 
+  /**
+   * Page through a list endpoint until it runs dry. NOT an optimisation — a correctness fix.
+   *
+   * `listIssueComments` is repo-wide and the ledger is an issue, so the ledger's entries compete
+   * for room with every PR comment in the repository. At 105 comments the first page of 100 held
+   * only 14 of the ledger's 16, and the two it dropped were the NEWEST — exactly the ones that
+   * decide current state. The bot then reduced a stale ledger, believed a settled promise was
+   * still merely "filed", and went silent on a pull request it should have spoken about. Silence
+   * is this product's default, which is precisely why a bug that causes silence hides so well.
+   *
+   * Capped so a runaway repository cannot turn one tick into hundreds of calls; hitting the cap
+   * is logged rather than swallowed, because a truncated ledger is a wrong answer, not a slow one.
+   */
+  async function paged(path, params, { maxPages = 10 } = {}) {
+    const out = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const per_page = params.per_page ?? 100;
+      const batch = await call("GET", `${path}?${q({ ...params, per_page, page })}`);
+      if (!Array.isArray(batch)) return batch;
+      out.push(...batch);
+      if (batch.length < per_page) return out;
+      if (page === maxPages) log(`WARNING: ${path} still had results after ${maxPages} pages — the ledger read may be truncated`);
+    }
+    return out;
+  }
+
   const client = {
     listIssues: ({ labels, state = "all", per_page = 100 } = {}) => call("GET", `${R}/issues?${q({ labels, state, per_page })}`),
     listPulls: ({ state = "open", per_page = 50 } = {}) => call("GET", `${R}/pulls?${q({ state, sort: "updated", direction: "desc", per_page })}`),
     listPullFiles: (number) => call("GET", `${R}/pulls/${number}/files?per_page=100`),
-    listIssueComments: ({ since, per_page = 100 } = {}) => call("GET", `${R}/issues/comments?${q({ since, sort: "created", direction: "asc", per_page })}`),
+    listIssueComments: ({ since, per_page = 100 } = {}) => paged(`${R}/issues/comments`, { since, sort: "created", direction: "asc", per_page }),
     listReviewComments: ({ since, per_page = 100 } = {}) => call("GET", `${R}/pulls/comments?${q({ since, sort: "created", direction: "asc", per_page })}`),
     createComment: (number, body) => call("POST", `${R}/issues/${number}/comments`, { body }),
     listReactions: (commentId) => call("GET", `${R}/issues/comments/${commentId}/reactions?per_page=100`),
