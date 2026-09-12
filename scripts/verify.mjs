@@ -136,7 +136,12 @@ step("tests", () => {
   //    abandoned idea's suite. Pass IOU's test files explicitly so the number means IOU.
   const testFiles = sourceFiles(resolve(root, "tests")).filter((f) => /.test.mjs$/.test(f));
   if (testFiles.length === 0) return "tests/ exists but contains no *.test.mjs files";
-  const r = spawnSync("node", ["--test", "--test-reporter=tap", ...testFiles], {
+  // 4. Serially. Run in parallel, adapter.test.mjs intermittently aborts the whole file with
+  //    Windows exit code 3221226505 (0xC0000409) — a process-level crash, not an assertion, and
+  //    it takes its seven tests down with it. The same file passes alone every time. The suite
+  //    runs in well under a second either way, so determinism costs nothing here and a gate that
+  //    is occasionally red for no reason is worse than a slow one: it teaches you to re-run.
+  const r = spawnSync("node", ["--test", "--test-concurrency=1", "--test-reporter=tap", ...testFiles], {
     cwd: root,
     encoding: "utf8",
     env,
@@ -250,7 +255,7 @@ step("adapter-cap", () => {
 // "green" while items 3-8 (the ENTIRE demo path) had never been exercised. That is the third
 // instance of this project's own anti-pattern, after the zero-tests gate and the 10:08 run.
 //
-// It is opt-in (IOU_LIVE=1) for two reasons: it takes minutes,
+// It is opt-in (IOU_LIVE=1) for two reasons, both recorded in DECISIONS.md: it takes minutes,
 // well past the Stop hook's 60s budget; and while several agent sessions share the one
 // playground repo, concurrent runs interleave their PRs and issues, so each run's evidence
 // records objects another run created. Opt-out is LOUD — never a silent pass.
