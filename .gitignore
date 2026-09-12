@@ -1,0 +1,15 @@
+# Secrets — never commit. The GitHub App private key and the .env that points at it.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+node_modules/
+
+# Local bot bookkeeping (cursor, handled comment ids). Not the ledger — that lives in GitHub.
+.iou/
+
+.DS_Store
+Thumbs.db
+__pycache__/

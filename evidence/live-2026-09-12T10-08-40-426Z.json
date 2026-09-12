@@ -1,0 +1,31 @@
+{
+  "run": "iou-e2e-2026-09-12T10-08-40",
+  "repo": "devinjones521/iou-playground",
+  "started": "2026-09-12T10:08:40.427Z",
+  "items": {
+    "1": {
+      "credential": "app",
+      "repo": "devinjones521/iou-playground",
+      "issues_seen": 0
+    }
+  },
+  "finished": "2026-09-12T10:12:05.931Z",
+  "log": [
+    "bot credential: app as devinjones521-iou-bot[bot]; human: @devinjones521",
+    "human: promise comment https://github.com/devinjones521/iou-playground/pull/1#issuecomment-5645236690",
+    "ledger issue created: https://github.com/devinjones521/iou-playground/issues/2",
+    "wake: comment 5645236690 on PR #1 by @devinjones521 (issue)",
+    "  ERROR classifying 5645236690: llm timeout after 60000ms — leaving it unrecorded (fail closed)",
+    "PR #1: no open IOUs — silent",
+    "wake: comment 5645241673 on PR #1 by @devinjones521 (issue)",
+    "  ERROR classifying 5645241673: llm timeout after 60000ms — leaving it unrecorded (fail closed)",
+    "wake: comment 5645241715 on PR #1 by @devinjones521 (issue)",
+    "  ERROR classifying 5645241715: llm timeout after 60000ms — leaving it unrecorded (fail closed)",
+    "PR #1: no open IOUs — silent",
+    "wake: no new comments since 2026-09-12T10:09:48.702Z",
+    "PR #3: no open IOUs — silent",
+    "wake: no new comments since 2026-09-12T10:11:53.417Z",
+    "PR #4: no open IOUs — silent",
+    "wake: no new comments since 2026-09-12T10:11:58.611Z"
+  ]
+}

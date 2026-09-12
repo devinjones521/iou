@@ -1,0 +1,18 @@
+{
+  "name": "iou",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A GitHub bot that remembers the promises made in PR threads and speaks only when the code is next touched.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "verify": "node scripts/verify.mjs",
+    "test": "node --test",
+    "live": "node --test tests/live.e2e.mjs",
+    "demo": "node scripts/demo.mjs",
+    "tick": "node -e \"import('./src/github.mjs').then(async ({github,resolveAuth})=>{const {tick}=await import('./src/tick.mjs');const {repoFromEnv,stamp}=await import('./src/util.mjs');const {owner,repo}=repoFromEnv();const a=await resolveAuth();await tick(github({owner,repo,token:a.token,log:(m)=>console.log(stamp()+' '+m)}),{log:(m)=>console.log(stamp()+' '+m)})})\"",
+    "watch": "node src/watch.mjs"
+  }
+}

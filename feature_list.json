@@ -1,0 +1,102 @@
+{
+  "_contract": [
+    "You may only ever change `passes` and `evidence` on an existing item.",
+    "Why: an agent that can edit its own scoreboard cannot lose.",
+    "`passes` may become true ONLY when a test drove the feature through the real interface,",
+    "it passed, and `evidence` names the artifact that proves it (a log path, a record URL, a test name).",
+    "Never set `passes: true` from reading code.",
+    "`state` may be `demo-path` (held to the production bar) or `held-open` (off the demo path,",
+    "not yet proven, NOT dead - carries a `review_by` time).",
+    "Adding a new item is allowed. Deleting or rewording an existing one is not."
+  ],
+  "items": [
+    {
+      "id": 1,
+      "feature": "Auth + playground repo reachable through the narrow adapter",
+      "evidence_required": "GET /repos/{owner}/{repo} returns 200 through the adapter; evidence file names the repo full name",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.1 — credential app, GET /repos 200 on devinjones521/iou-playground"
+    },
+    {
+      "id": 2,
+      "feature": "Narrow GitHub adapter, at most 8 operations, cap enforced by a test",
+      "evidence_required": "a test asserts the declared operation count is <= 8 and fails above it",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "tests/adapter.test.mjs#adapter declares at most 8 operations; every client method is a declared operation and vice versa. Also scripts/verify.mjs step adapter-cap, which counts them statically so the cap survives deleting the test."
+    },
+    {
+      "id": 3,
+      "feature": "Wake on a real comment with no typed prompt: poll with a cursor, no double-handling",
+      "evidence_required": "log line with the real comment id; a second tick does not re-handle the same comment",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.3 — woke on real comment 5645327303, second tick recorded 0"
+    },
+    {
+      "id": 4,
+      "feature": "Promise classification that fails closed; negative fixtures are not recorded",
+      "evidence_required": "test name; fixtures include 'I'll never do that' and plain praise, both rejected; malformed model output treated as not-a-promise",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.4 — promise at confidence 0.95; 2 negatives incl. \"I will never do that\" recorded 0; tests/pure.test.mjs verdictFrom + parseJsonObject"
+    },
+    {
+      "id": 5,
+      "feature": "Ledger persisted in the repository as an issue, re-fetched and asserted",
+      "evidence_required": "ledger issue URL returned by the API and re-fetched",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.5 — ledger issue /issues/2, entry #issuecomment-5645328113, re-fetched and reduced"
+    },
+    {
+      "id": 6,
+      "feature": "Resurface: a PR touching promised code gets exactly one real comment linking the source promise",
+      "evidence_required": "comment URL returned by the API; the comment body contains the source comment URL",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.6 — PR 14 comment #issuecomment-5645329938 by devinjones521-iou-bot[bot], links source, second tick resurfaced 0"
+    },
+    {
+      "id": 7,
+      "feature": "Silence: a PR not touching any open IOU gets no comment and a log line says why",
+      "evidence_required": "comment count on the PR unchanged after a tick; log line quoted in evidence",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.7 — PR 13 comments 0 before and after; log \"touches none of 1 open IOU(s) — silent\""
+    },
+    {
+      "id": 8,
+      "feature": "Human-in-the-loop: thumbs-up reaction opens a tracking issue assigned to the promiser; nothing is filed without it",
+      "evidence_required": "issue URL; the test asserts no issue exists before the reaction and one exists after",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.8 — no issue before the reaction; after 👍 issue /issues/15 assigned to devinjones521"
+    },
+    {
+      "id": 9,
+      "feature": "Failure path: forced GitHub 5xx retries then degrades gracefully with no crash; model garbage is treated as not-a-promise",
+      "evidence_required": "test names for both cases",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "tests/adapter.test.mjs#forced 5xx retries then succeeds; retry budget exhausted throws a typed error; tick degrades gracefully when GitHub is down without advancing the cursor. Fail-closed parsers in tests/pure.test.mjs."
+    },
+    {
+      "id": 10,
+      "feature": "Bot identity: comments are authored by iou[bot] via a GitHub App, not by a personal account",
+      "evidence_required": "comment author login ends in [bot], fetched from the API",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.10 — every bot object authored by devinjones521-iou-bot[bot], distinct from the human"
+    },
+    {
+      "id": 11,
+      "feature": "Settle beat: a PR that keeps the promise gets a one-line settling comment and the ledger entry closes",
+      "evidence_required": "comment URL and the ledger entry marked settled",
+      "state": "demo-path",
+      "passes": true,
+      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.11 — PR keeps the promise, one settle comment by the bot, ledger entry settled, no approval requested"
+    }
+  ]
+}
