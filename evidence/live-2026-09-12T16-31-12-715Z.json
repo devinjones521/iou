@@ -1,0 +1,98 @@
+{
+  "run": "iou-e2e-2026-09-12T16-31-12",
+  "repo": "devinjones521/iou-playground",
+  "started": "2026-09-12T16:31:12.716Z",
+  "items": {
+    "1": {
+      "credential": "app",
+      "repo": "devinjones521/iou-playground",
+      "issues_seen": 93
+    },
+    "3": {
+      "woke_on_comment": "https://github.com/devinjones521/iou-playground/pull/94#issuecomment-5647193159",
+      "comment_id": 5647193159,
+      "second_tick_recorded": 0
+    },
+    "4": {
+      "positive": {
+        "comment": "https://github.com/devinjones521/iou-playground/pull/94#issuecomment-5647193159",
+        "what": "Add retry handling to fetchUser",
+        "confidence": 0.95
+      },
+      "negatives": [
+        "https://github.com/devinjones521/iou-playground/pull/94#issuecomment-5647194455",
+        "https://github.com/devinjones521/iou-playground/pull/94#issuecomment-5647194494"
+      ],
+      "negatives_recorded": 0
+    },
+    "5": {
+      "ledger_issue": "https://github.com/devinjones521/iou-playground/issues/67",
+      "entry": "https://github.com/devinjones521/iou-playground/issues/67#issuecomment-5647193562"
+    },
+    "6": {
+      "pr": "https://github.com/devinjones521/iou-playground/pull/96",
+      "comment": "https://github.com/devinjones521/iou-playground/pull/96#issuecomment-5647196819",
+      "author": "devinjones521-iou-bot[bot]",
+      "links_source": true,
+      "second_tick_resurfaced": 0
+    },
+    "7": {
+      "pr": "https://github.com/devinjones521/iou-playground/pull/95",
+      "comments_before": 0,
+      "comments_after": 0,
+      "log_line": "PR #95: touches none of 3 outstanding IOU(s) — silent"
+    },
+    "10": {
+      "author": "devinjones521-iou-bot[bot]",
+      "human": "devinjones521",
+      "ledger_entries": 24,
+      "resurface_author": "devinjones521-iou-bot[bot]"
+    },
+    "11": {
+      "pr": "https://github.com/devinjones521/iou-playground/pull/100",
+      "comment": "https://github.com/devinjones521/iou-playground/pull/100#issuecomment-5647199467",
+      "author": "devinjones521-iou-bot[bot]",
+      "ledger_status": "settled",
+      "asked_for_approval": false
+    }
+  },
+  "finished": "2026-09-12T16:32:40.211Z",
+  "log": [
+    "bot credential: app as devinjones521-iou-bot[bot]; human: @devinjones521",
+    "human: promise comment https://github.com/devinjones521/iou-playground/pull/94#issuecomment-5647193159",
+    "wake: comment 5647193159 on PR #94 by @devinjones521 (issue)",
+    "  promise recorded: \"Add retry handling to fetchUser\" → https://github.com/devinjones521/iou-playground/issues/67#issuecomment-5647193562 (2154 ms)",
+    "PR #94: resurfaced 2 IOU(s) → https://github.com/devinjones521/iou-playground/pull/94#issuecomment-5647194084",
+    "tick spent 3 model call(s); 1969 left of the lifetime budget",
+    "wake: no new comments since 2026-09-12T16:31:20.212Z",
+    "PR #94: already commented here — silent",
+    "wake: comment 5647194455 on PR #94 by @devinjones521 (issue)",
+    "  not a promise (1685 ms)",
+    "wake: comment 5647194494 on PR #94 by @devinjones521 (issue)",
+    "  not a promise (1537 ms)",
+    "PR #94: already commented here — silent",
+    "tick spent 2 model call(s); 1967 left of the lifetime budget",
+    "wake: no new comments since 2026-09-12T16:31:34.679Z",
+    "PR #95: touches none of 3 outstanding IOU(s) — silent",
+    "PR #94: already commented here — silent",
+    "wake: no new comments since 2026-09-12T16:31:44.396Z",
+    "PR #96: resurfaced 3 IOU(s) → https://github.com/devinjones521/iou-playground/pull/96#issuecomment-5647196819",
+    "tick spent 3 model call(s); 1964 left of the lifetime budget",
+    "wake: no new comments since 2026-09-12T16:31:51.007Z",
+    "PR #96: already commented here — silent",
+    "wake: no new comments since 2026-09-12T16:32:01.545Z",
+    "wake: no new comments since 2026-09-12T16:32:04.691Z",
+    "👍 by @devinjones521: filed https://github.com/devinjones521/iou-playground/issues/97 for \"Add retry handling to fetchUser\"",
+    "👍 by @devinjones521: filed https://github.com/devinjones521/iou-playground/issues/98 for \"Add retry handling to fetchUser\"",
+    "👍 by @devinjones521: filed https://github.com/devinjones521/iou-playground/issues/99 for \"Add retry handling to fetchUser\"",
+    "wake: no new comments since 2026-09-12T16:32:07.785Z",
+    "PR #100: KEEPS \"Add retry handling to fetchUser\" — The diff rewrites fetchUser with a retry loop, configurable retry count, and exponential backoff, directly implementing the promised retry handling. (2021 ms)",
+    "PR #100: KEEPS \"Add retry handling to fetchUser\" — The diff rewrites fetchUser with a retry loop, configurable retry count, and exponential backoff, directly implementing the promised retry handling. (1817 ms)",
+    "PR #100: KEEPS \"Add retry handling to fetchUser\" — The diff rewrites fetchUser with a retry loop, configurable retry count, and exponential backoff, directly implementing the promised retry handling. (2791 ms)",
+    "  told tracking issue #97 that the promise was kept",
+    "  told tracking issue #98 that the promise was kept",
+    "  told tracking issue #99 that the promise was kept",
+    "PR #100: settled 3 IOU(s) → https://github.com/devinjones521/iou-playground/pull/100#issuecomment-5647199467",
+    "tick spent 3 model call(s); 1961 left of the lifetime budget"
+  ]
+}

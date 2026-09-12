@@ -1,0 +1,32 @@
+{
+  "run": "iou-e2e-2026-09-12T16-35-45",
+  "repo": "devinjones521/iou-playground",
+  "started": "2026-09-12T16:35:45.182Z",
+  "items": {
+    "1": {
+      "credential": "app",
+      "repo": "devinjones521/iou-playground",
+      "issues_seen": 100
+    }
+  },
+  "finished": "2026-09-12T16:36:27.046Z",
+  "log": [
+    "bot credential: app as devinjones521-iou-bot[bot]; human: @devinjones521",
+    "human: promise comment https://github.com/devinjones521/iou-playground/pull/111#issuecomment-5647218164",
+    "wake: comment 5647218164 on PR #111 by @devinjones521 (issue)",
+    "  SKIPPED without spending: @devinjones521 is over the hourly limit of 12 calls (20 used)",
+    "PR #111: no outstanding IOUs — silent",
+    "wake: comment 5647218498 on PR #111 by @devinjones521 (issue)",
+    "  SKIPPED without spending: @devinjones521 is over the hourly limit of 12 calls (20 used)",
+    "wake: comment 5647218543 on PR #111 by @devinjones521 (issue)",
+    "  SKIPPED without spending: @devinjones521 is over the hourly limit of 12 calls (20 used)",
+    "PR #111: no outstanding IOUs — silent",
+    "wake: no new comments since 2026-09-12T16:35:56.077Z",
+    "PR #112: no outstanding IOUs — silent",
+    "wake: no new comments since 2026-09-12T16:36:01.803Z",
+    "PR #113: no outstanding IOUs — silent",
+    "wake: no new comments since 2026-09-12T16:36:07.822Z",
+    "wake: no new comments since 2026-09-12T16:36:11.189Z",
+    "PR #114: no outstanding IOUs — silent"
+  ]
+}

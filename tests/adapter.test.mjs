@@ -109,9 +109,14 @@ function ledgerServer({ ledgerNumber = 7, entries = [], prComments = [] }) {
 
 test("a promise already in the ledger is not recorded again, and costs no model call", async () => {
   const LEDGER = 7, SRC = 424242;
+  // The ledger read is author-filtered now: entries not written by the bot are conversation, not
+  // memory. So the fixture has to wear the same login the code will check against.
+  const BOT = "iou-test[bot]";
+  const prevBot = process.env.IOU_BOT_LOGIN;
+  process.env.IOU_BOT_LOGIN = BOT;
   const entry = (status) => ({
     id: 900 + status.length, issue_url: `http://x/repos/o/r/issues/${LEDGER}`,
-    user: { login: "iou[bot]" }, created_at: "2026-09-12T14:50:00Z",
+    user: { login: BOT }, created_at: "2026-09-12T14:50:00Z",
     html_url: `http://x/repos/o/r/issues/${LEDGER}#issuecomment-${900 + status.length}`,
     body: formatEntry({ id: `c${SRC}`, status, who: "contributor", what: "Add retry handling to fetchUser", source: "http://x/s" }),
   });
@@ -136,6 +141,7 @@ test("a promise already in the ledger is not recorded again, and costs no model 
     assert.ok(logs.some((l) => l.includes("already in the ledger")), logs.join("\n"));
   } finally {
     server.close();
+    if (prevBot === undefined) delete process.env.IOU_BOT_LOGIN; else process.env.IOU_BOT_LOGIN = prevBot;
   }
 });
 

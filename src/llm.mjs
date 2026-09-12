@@ -23,8 +23,13 @@ import Anthropic from "@anthropic-ai/sdk";
 // quota, which trades the product's accuracy for someone else's budget without telling them and is
 // not the author's call to make silently. IOU_MODEL overrides it; the spend ceiling in budget.mjs
 // is the safety mechanism, not a quiet downgrade.
-export const MODEL = process.env.IOU_MODEL || "claude-opus-5";
-const CLI_MODEL = process.env.IOU_CLI_MODEL || "opus";
+// Read at CALL time, not at module-evaluation time. ESM hoists imports, so anything computed at
+// module scope here is fixed before `loadDotEnv()` in watch.mjs has run — which meant IOU_MODEL in
+// a .env file was silently ignored and the startup banner printed the wrong model. util.mjs warns
+// about exactly this coupling one file over. Systemd was unaffected (EnvironmentFile sets real env
+// vars); every local user was not.
+export const modelId = () => process.env.IOU_MODEL || "claude-opus-5";
+const CLI_MODEL = () => process.env.IOU_CLI_MODEL || "opus";
 const MAX_TOKENS = 1024; // these are small JSON answers; the ceiling is a guard, not a target
 
 let client = null;
@@ -40,7 +45,7 @@ export function backend(env = process.env) {
   return "claude-cli";
 }
 
-export async function ask(userText, { system, model = MODEL, timeoutMs = 60_000 } = {}) {
+export async function ask(userText, { system, model = modelId(), timeoutMs = 60_000 } = {}) {
   switch (backend()) {
     case "anthropic-api": return askAnthropic(userText, system, model);
     case "openrouter": return askOpenRouter(userText, system, timeoutMs);
@@ -92,7 +97,7 @@ async function askOpenRouter(userText, system, timeoutMs) {
 }
 
 function askCli(userText, system, timeoutMs) {
-  const args = ["-p", userText, "--model", CLI_MODEL, "--output-format", "json", "--max-turns", "1"];
+  const args = ["-p", userText, "--model", CLI_MODEL(), "--output-format", "json", "--max-turns", "1"];
   if (system) args.push("--system-prompt", system);
   const env = { ...process.env };
   delete env.CLAUDECODE; // the CLI refuses to nest inside a Claude Code session otherwise

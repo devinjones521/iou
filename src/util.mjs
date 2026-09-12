@@ -20,9 +20,15 @@ export function loadDotEnv(file = ".env", env = process.env) {
 }
 
 export function repoFromEnv(env = process.env) {
-  const full = env.IOU_REPO || "devinjones521/iou-playground";
+  // No default. This used to fall back to the author's own playground, which meant anyone who
+  // cloned the repo, followed the README and left IOU_REPO blank pointed a bot at someone else's
+  // repository under their own GitHub token — silently, and with no error to tell them.
+  const full = (env.IOU_REPO || "").trim();
   const [owner, repo] = full.split("/");
-  if (!owner || !repo) throw new Error(`IOU_REPO must be owner/repo, got "${full}"`);
+  if (!owner || !repo) {
+    throw new Error(`IOU_REPO must be set to owner/repo — got ${full ? `"${full}"` : "nothing"}. ` +
+      `Set it in .env to the repository you want the bot to watch.`);
+  }
   return { owner, repo };
 }
 

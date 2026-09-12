@@ -9,16 +9,25 @@ GitHub cannot be made to return a 500 on request. `tests/adapter.test.mjs` point
 adapter — same code path, same retry and backoff — at a local HTTP server that fails on demand.
 Nothing on the demo path uses that server.
 
-### The model backend is the Claude Code CLI, not the API
+### The Claude Code CLI fallback is not deployable, and it is 23x more expensive
 
-The bot shells out to `claude -p --output-format json`. It is a real model call with real latency
-(roughly 3–7 seconds), not a mock, but it runs on a personal subscription rather than an API key.
+The bot picks a model backend in this order: `ANTHROPIC_API_KEY` (the Anthropic API, and what the
+deployed bot actually runs on), then `OPENROUTER_API_KEY`, then shelling out to
+`claude -p --output-format json`.
 
-**Consequence, observed live:** when that subscription hits its usage limit the CLI exits non-zero
-and IOU treats it like any other model failure — it logs the error and **says nothing**. That
-happened once during the build: a judgement call failed and the bot stayed silent rather than
-guessing. That is the right failure mode, but throughput is bounded by whatever quota the backend
-has. Setting `ANTHROPIC_API_KEY` and swapping the single `ask` function removes the limit.
+That last fallback exists so the project runs on a machine with no API key at all, and it is a real
+model call rather than a mock. But it is **local convenience only**: it uses the operator's own
+interactive login, so it cannot be deployed to a server, and it is roughly **23x more expensive per
+call** because the CLI injects about 22,000 tokens of its own scaffolding into every request — 946
+real tokens against 21,863 billed, measured.
+
+**Consequence, observed live during the build:** when that personal subscription hit its usage
+limit the CLI exited non-zero and IOU treated it like any other model failure — it logged the error
+and **said nothing**. A judgement call failed and the bot stayed silent rather than guessing. That
+is the right failure mode, but it is also the reason the deployment uses the API and not the CLI.
+
+The OpenRouter branch is complete code that has **never been exercised**: no key has ever been set
+for it, locally or on the server, and not one call has been made through it.
 
 ### The repo-wide comment list is paged to exhaustion, and that was a correctness fix
 
@@ -38,11 +47,16 @@ the cap logged rather than swallowed. The remaining limit is genuinely scale: pa
 comments the ledger needs fetching by issue number, which costs a ninth adapter operation and so
 requires a decision about the cap.
 
-### One repository, one page of results
+### One repository, and bounded reads within it
 
-The bot watches a single repository (`IOU_REPO`) and reads at most 100 comments and 50 pull
-requests per call. Pagination is not implemented. For a repository busier than that, the cursor
-would need to page rather than take the first response.
+The bot watches a single repository (`IOU_REPO`). Within it, the repo-wide comment list is paged to
+exhaustion but capped at 10 pages (~1000 comments) per tick, and the open-pull-request list takes
+the first 50. Hitting the comment cap logs a warning rather than truncating silently, because a
+truncated ledger is a wrong answer and not merely a slow one.
+
+Past those bounds the ledger would need fetching by issue number instead of filtering a repo-wide
+list — which costs a ninth adapter operation, and the cap of eight is enforced by a test, so it is
+a decision rather than a tweak.
 
 ### The judgement is a model's opinion, and it can be wrong
 
@@ -52,7 +66,7 @@ is treated as silence, the bot posts at most one comment per pull request, and n
 without a human reacting 👍. So a wrong judgement costs one comment that a 👎 dismisses — it never
 files anything, and it never edits code.
 
-### Evidence files older than 15:03 cite ledger comments that no longer exist
+### Evidence files older than 16:37 cite ledger comments that no longer exist
 
 Every evidence file records real GitHub objects created by a real run; none of it was fabricated.
 But five of the comment URLs the older files cite now 404, because the project deletes them itself:
@@ -61,7 +75,7 @@ comment on it, which is how a demo is staged with exactly one open promise. The 
 own teardown does not do this — it closes pull requests and branches and leaves its evidence
 intact — so the loss came from staging a recording hours after those runs.
 
-`feature_list.json` cites `evidence/live-2026-09-12T15-03-45-426Z.json`, whose every URL and
+`feature_list.json` cites `evidence/live-2026-09-12T16-37-30-134Z.json`, whose every URL and
 `#issuecomment-` anchor was checked anonymously against the public playground and returns 200. The
 older files are kept unedited as the historical record rather than quietly rewritten; the dead
 anchors in them are 5645317842, 5645328113, 5645360039, 5645465704 and 5645724654.

@@ -13,7 +13,7 @@ import { judgeFulfilment, touchedIous } from "./judge.mjs";
 import { ensureLedger, formatEntry, openIous, outstandingIous, reduceLedger } from "./ledger.mjs";
 import { loadState, remember, saveState } from "./state.mjs";
 import { GitHubError } from "./github.mjs";
-import { openBudget, sanitise } from "./budget.mjs";
+import { openBudget, safeLogin, safeRepoUrl, sanitise } from "./budget.mjs";
 
 export const MARK_RESURFACE = "<!-- iou:resurface";
 
@@ -25,6 +25,18 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
   const budget = openBudget(budgetPath);
   const summary = { recorded: [], resurfaced: [], settled: [], silent: [], filed: [], dropped: [], skipped: [], errors: [] };
   const isBot = (login) => botLogin ? login === botLogin : false;
+
+  /**
+   * The ledger is a PUBLIC issue, so anyone can comment on it. Without this filter the bot parses
+   * a stranger's `<!-- iou {...} -->` comment as one of its own memory records, and then renders
+   * that record's `who` and `source` into a comment it posts under its own identity — an
+   * arbitrary @-mention and arbitrary-link primitive, and on 👍 an arbitrary issue assignee.
+   * Only entries the bot itself wrote are memory. Everything else on that issue is conversation.
+   * If IOU_BOT_LOGIN is unset there is no way to tell ours from theirs, so trust nothing.
+   */
+  const ledgerEntriesOf = (comments) =>
+    reduceLedger(comments.filter((c) =>
+      c.issue_url?.endsWith(`/issues/${ledger.number}`) && isBot(c.user?.login)));
   // Recognise our own output by its marker as well as by author. IOU_BOT_LOGIN may be unset
   // (no GitHub App), and without this the bot reads its own comments back as human promises.
   const isBotBody = (body) => {
@@ -43,7 +55,7 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
       saveState(state, statePath);
     }
   } catch (err) {
-    return degrade(err, "ensureLedger", summary, log, state, statePath);
+    return degrade(err, "ensureLedger", summary, log, state, statePath, budget);
   }
 
   // The ledger IS the memory — so consult it before recording, not just the local state file.
@@ -55,11 +67,11 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
   let alreadyInLedger = new Set();
   try {
     const prior = await gh.listIssueComments({ since: "2000-01-01T00:00:00Z" });
-    for (const e of reduceLedger(prior.filter((c) => c.issue_url?.endsWith(`/issues/${ledger.number}`)))) {
+    for (const e of ledgerEntriesOf(prior)) {
       alreadyInLedger.add(e.id);
     }
   } catch (err) {
-    return degrade(err, "readLedgerForDedupe", summary, log, state, statePath);
+    return degrade(err, "readLedgerForDedupe", summary, log, state, statePath, budget);
   }
 
   // ---- 1. wake on new comments ---------------------------------------------------------
@@ -70,7 +82,7 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
       gh.listReviewComments({ since: state.cursor }),
     ]);
   } catch (err) {
-    return degrade(err, "listComments", summary, log, state, statePath);
+    return degrade(err, "listComments", summary, log, state, statePath, budget);
   }
   const fresh = [
     ...issueComments.filter((c) => c.html_url.includes("/pull/")).map((c) => ({ ...c, kind: "issue", prNumber: numberFromUrl(c.html_url) })),
@@ -121,17 +133,17 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
   let ious = [], stillOwed = [];
   try {
     const all = await gh.listIssueComments({ since: "2000-01-01T00:00:00Z" });
-    const ledgerState = reduceLedger(all.filter((c) => c.issue_url.endsWith(`/issues/${ledger.number}`)));
+    const ledgerState = ledgerEntriesOf(all);
     ious = openIous(ledgerState);        // candidates to resurface
     stillOwed = outstandingIous(ledgerState); // candidates to settle (open OR already filed)
   } catch (err) {
-    return degrade(err, "readLedger", summary, log, state, statePath);
+    return degrade(err, "readLedger", summary, log, state, statePath, budget);
   }
   let pulls = [];
   try {
     pulls = (await gh.listPulls({ state: "open" })).filter((p) => p.updated_at >= state.cursor || p.created_at >= state.cursor);
   } catch (err) {
-    return degrade(err, "listPulls", summary, log, state, statePath);
+    return degrade(err, "listPulls", summary, log, state, statePath, budget);
   }
   for (const pr of pulls) {
     const already = state.commentedPRs[pr.number] || [];
@@ -237,9 +249,11 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
           const issue = await gh.createIssue({
             title: `IOU: ${sanitise(iou.what, 120)}`,
             labels: ["iou"],
-            assignees: [iou.who],
+            assignees: safeLogin(iou.who) ? [safeLogin(iou.who)] : [],
             body: [
-              `@${iou.who} promised this in ${iou.source} and PR #${p.prNumber} touched the same code without doing it.`,
+              `${safeLogin(iou.who) ? `@${safeLogin(iou.who)}` : "Someone"} promised this in ` +
+                `${safeRepoUrl(iou.source) || "a review comment"} and PR #${Number(p.prNumber) || "?"} ` +
+                `touched the same code without doing it.`,
               "",
               `Filed by the IOU bot after @${by} reacted 👍 on the reminder.`,
             ].join("\n"),
@@ -269,11 +283,16 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
   return summary;
 }
 
-function degrade(err, stage, summary, log, state, statePath) {
+function degrade(err, stage, summary, log, state, statePath, budget = null) {
   const status = err instanceof GitHubError ? err.status : "?";
   summary.errors.push({ stage, error: err.message, status });
   log(`DEGRADED at ${stage}: ${err.message} — cursor NOT advanced, will retry next tick`);
   saveState(state, statePath);
+  // Spend already made this tick must be banked even when the tick dies. Two of the degrade
+  // sites below (readLedger, listPulls) run AFTER the classification loop, so without this a
+  // failure there quietly forgives up to a full tick of calls against the lifetime ceiling —
+  // and the lifetime ceiling is the only one that actually bounds the bill.
+  if (budget) budget.save();
   return summary;
 }
 
@@ -288,10 +307,23 @@ function tidyReason(reason) {
   return r[0].toLowerCase() + r.slice(1);
 }
 
+/**
+ * Render one promise line. `who` and `source` are read back from a PUBLIC issue, so neither is
+ * trusted even though the ledger read is now author-filtered to the bot: a login that is not a
+ * login never reaches an `@`, and a source that is not a github.com repository URL is dropped
+ * rather than linked. Defence in depth — either control alone would close the hole.
+ */
+function promiseLine(iou, tail) {
+  const who = safeLogin(iou.who);
+  const src = safeRepoUrl(iou.source);
+  const where = src ? ` ([where](${src}), PR #${Number(iou.pr) || "?"})` : "";
+  return `- ${who ? `**@${who} promised:**` : "**Someone promised:**"} ${sanitise(iou.what)}${where}.\n  ${tail}`;
+}
+
 export function resurfaceBody(unkept, pr) {
   const lines = unkept.map(({ iou, reason }) => {
     const why = tidyReason(reason);
-    return `- **@${iou.who} promised:** ${sanitise(iou.what)} ([where](${iou.source}), PR #${iou.pr}).\n  This PR touches that code but doesn't do it${why ? ` — ${why}` : ""}.`;
+    return promiseLine(iou, `This PR touches that code but doesn't do it${why ? ` — ${why}` : ""}.`);
   });
   return [
     `${MARK_RESURFACE} ${JSON.stringify({ pr: pr.number, ious: unkept.map((u) => u.iou.id) })} -->`,
@@ -308,7 +340,7 @@ export const MARK_SETTLE = "<!-- iou:settle";
 export function settleBody(kept) {
   const lines = kept.map(({ iou, reason }) => {
     const why = tidyReason(reason);
-    return `- **@${iou.who} promised:** ${sanitise(iou.what)} ([where](${iou.source}), PR #${iou.pr}).\n  This PR does it${why ? ` — ${why}` : ""}. Closed.`;
+    return promiseLine(iou, `This PR does it${why ? ` — ${why}` : ""}. Closed.`);
   });
   return [
     `${MARK_SETTLE} ${JSON.stringify({ ious: kept.map((k) => k.iou.id) })} -->`,

@@ -49,7 +49,7 @@ test("touchedIous: deterministic path and symbol matching", () => {
 });
 
 test("ledger: entries round-trip and the latest status wins", () => {
-  const open = { id: "c1", status: "open", who: "dev", what: "add retries", paths: [], symbols: [], source: "https://x/pull/1#issuecomment-1", pr: 1 };
+  const open = { id: "c1", status: "open", who: "dev", what: "add retries", paths: [], symbols: [], source: "https://github.com/o/r/pull/1#issuecomment-1", pr: 1 };
   const body = formatEntry(open);
   assert.deepEqual(parseEntry(body), open);
   assert.equal(parseEntry("no marker here"), null);
@@ -62,14 +62,14 @@ test("ledger: entries round-trip and the latest status wins", () => {
 });
 
 test("resurfaceBody: carries the marker, the source link and the reaction instructions", () => {
-  const b = resurfaceBody([{ iou: { who: "dev", what: "add retries", source: "https://x/pull/1#issuecomment-1", pr: 1, id: "c1" }, reason: "diff only renames" }], { number: 2 });
+  const b = resurfaceBody([{ iou: { who: "dev", what: "add retries", source: "https://github.com/o/r/pull/1#issuecomment-1", pr: 1, id: "c1" }, reason: "diff only renames" }], { number: 2 });
   assert.ok(b.startsWith("<!-- iou:resurface"));
-  assert.ok(b.includes("https://x/pull/1#issuecomment-1"));
+  assert.ok(b.includes("https://github.com/o/r/pull/1#issuecomment-1"));
   assert.ok(b.includes("👍") && b.includes("👎"));
 });
 
 test("comment bodies never double-punctuate the model's reason (it is on camera)", () => {
-  const iou = { who: "dev", what: "add retries", source: "https://x/pull/1#issuecomment-1", pr: 1, id: "c1" };
+  const iou = { who: "dev", what: "add retries", source: "https://github.com/o/r/pull/1#issuecomment-1", pr: 1, id: "c1" };
   // The model reliably returns a capitalised, end-stopped sentence; it is spliced mid-sentence.
   const r = resurfaceBody([{ iou, reason: "The diff only refactors the return." }], { number: 2 });
   assert.ok(!/\.\./.test(r), `doubled full stop in:\n${r}`);
@@ -85,7 +85,7 @@ test("a hostile comment cannot make the bot post links, mentions or HTML", () =>
   const iou = {
     who: "attacker",
     what: 'Visit https://evil.example/pwn and ping @maintainer re #1337 <script>alert(1)</script>',
-    source: "https://x/pull/1#issuecomment-1", pr: 1, id: "c1",
+    source: "https://github.com/o/r/pull/1#issuecomment-1", pr: 1, id: "c1",
   };
   for (const body of [
     resurfaceBody([{ iou, reason: "Also see http://evil.example/2 <img src=x>" }], { number: 2 }),
@@ -95,14 +95,14 @@ test("a hostile comment cannot make the bot post links, mentions or HTML", () =>
     assert.ok(!/<script|<img/i.test(body), `HTML reached a bot comment:\n${body}`);
     assert.ok(!/(^|[^\w​])@maintainer/m.test(body), `live @-mention reached a bot comment:\n${body}`);
     // The legitimate source link, which the API gave us, must still be there.
-    assert.ok(body.includes("https://x/pull/1#issuecomment-1"), `the real source link was stripped:\n${body}`);
+    assert.ok(body.includes("https://github.com/o/r/pull/1#issuecomment-1"), `the real source link was stripped:\n${body}`);
   }
 });
 
 test("settleBody: marks the PR that kept the promise and asks for nothing", () => {
-  const s = settleBody([{ iou: { who: "dev", what: "add retries", source: "https://x/pull/1#issuecomment-1", pr: 1, id: "c1" }, reason: "adds a retry loop" }]);
+  const s = settleBody([{ iou: { who: "dev", what: "add retries", source: "https://github.com/o/r/pull/1#issuecomment-1", pr: 1, id: "c1" }, reason: "adds a retry loop" }]);
   assert.ok(s.startsWith("<!-- iou:settle"));
-  assert.ok(s.includes("https://x/pull/1#issuecomment-1"));
+  assert.ok(s.includes("https://github.com/o/r/pull/1#issuecomment-1"));
   assert.ok(!s.includes("👍"), "a settled IOU needs no human decision");
 });
 
@@ -156,4 +156,44 @@ test("ledger: a settled entry reads as kept, not as filed", () => {
   assert.ok(body.includes("kept by PR #9"), body);
   assert.equal(parseEntry(body).status, "settled");
   assert.equal(openIous(reduceLedger([{ body }])).length, 0, "settled is not open");
+});
+
+/**
+ * Security regression: the ledger is a PUBLIC issue, so anyone can comment on it.
+ *
+ * Before this was closed, a stranger could post `<!-- iou {...} -->` on the ledger and the bot
+ * parsed it as one of its own memory records — then rendered `who` and `source` RAW into a comment
+ * it posted under its own bot identity. That is an arbitrary @-mention and arbitrary-link
+ * primitive, and on 👍 an arbitrary issue assignee, all wearing the bot's face.
+ *
+ * Two independent controls now stand between a stranger and that comment. This covers the second:
+ * even handed a poisoned record directly, nothing that is not a real login reaches an `@`, and
+ * nothing that is not a URL inside github.com gets linked.
+ */
+test("a poisoned ledger record cannot make the bot mention or link anything", () => {
+  const poisoned = {
+    id: "cX", status: "open", pr: "9999 malicious",
+    who: 'nobody**  @torvalds @gvanrossum ROTATE YOUR KEYS NOW at promised:**',
+    what: "do the thing",
+    source: "https://evil.example/phish",
+  };
+  const body = resurfaceBody([{ iou: poisoned, reason: "" }], { number: 1 });
+
+  assert.ok(!body.includes("@torvalds"), `leaked a mention:\n${body}`);
+  assert.ok(!body.includes("@gvanrossum"), `leaked a mention:\n${body}`);
+  assert.ok(!body.includes("evil.example"), `leaked a link:\n${body}`);
+  assert.ok(body.includes("**Someone promised:**"), `should fall back to an anonymous form:\n${body}`);
+  assert.ok(!/\(\[where\]/.test(body), `should not render a link at all for a rejected source:\n${body}`);
+});
+
+test("a legitimate ledger record still renders the mention and the link", () => {
+  const real = {
+    id: "c1", status: "open", pr: 70, who: "devinjones521",
+    what: "Add retry handling to fetchUser",
+    source: "https://github.com/devinjones521/iou-playground/pull/68#issuecomment-1",
+  };
+  const body = resurfaceBody([{ iou: real, reason: "no retry logic" }], { number: 70 });
+  assert.ok(body.includes("**@devinjones521 promised:**"), body);
+  assert.ok(body.includes("https://github.com/devinjones521/iou-playground/pull/68#issuecomment-1"), body);
+  assert.ok(body.includes("PR #70"), body);
 });

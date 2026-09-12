@@ -51,10 +51,11 @@ failure. It failed shut rather than open, so it could never have manufactured a 
 
 ## A failure that was never explained
 
-The first two live runs recorded zero promises: every classification timed out at 60 seconds. Five
-theories were raised and **all five were measured and disproved** — shell quoting on Windows,
-contention from parallel processes, inherited stdin, test-runner environment variables, and prompt
-shape. The classifier was then proven correct standalone on three fixtures, and the fault has not
+The first two live runs recorded zero promises: every classification timed out at 60 seconds. Four
+theories were raised and **all four were measured and disproved** — shell quoting on Windows,
+contention from parallel processes, inherited stdin, and test-runner environment variables. A fifth
+(prompt shape) was named and **deliberately not tested**: pursuing it would have been grinding with
+no new evidence, and `BLOCKED.md` records that decision rather than quietly counting it as work. The classifier was then proven correct standalone on three fixtures, and the fault has not
 recurred across six subsequent runs.
 
 It is written up in `BLOCKED.md` rather than quietly dropped. Every failure mode is fail-closed —

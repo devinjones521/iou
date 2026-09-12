@@ -50,7 +50,7 @@ enforced structurally, not by prompting:
 | Comment isn't a promise | Nothing. Logs `not a promise` |
 | Model output unparseable or low-confidence | Nothing. Fails **closed** — never invents a promise |
 | PR touches no open IOU | Nothing. Deterministic pre-filter runs before any model call |
-| PR touches one and doesn't keep it | **One** comment, once per PR, ever |
+| PR touches one and doesn't keep it | **One** comment per pull request |
 | PR touches one that was already filed | Nothing. An issue exists; saying it again is nagging |
 | Nobody reacts | Nothing is filed |
 | PR **keeps** the promise | One comment closing the loop, and the ledger entry settles. Asks nothing |
@@ -60,8 +60,10 @@ also notices when you do the thing, says so once, and marks the ledger. It tells
 too — but it does **not** close it, because closing someone's issue is a judgement about their work,
 and the bot never takes an outward action nobody asked for.
 
-The negative fixtures are part of the test suite, including the one that matters most — *"I'll
-never do that"*, which contains every surface feature of a promise and is not one.
+The negative fixtures are part of the live end-to-end suite, including the one that matters most
+— *"I'll never do that"*, which contains every surface feature of a promise and is not one. It is
+sent to the real classifier against the real API, and the evidence file records that it was not
+recorded.
 
 ## Architecture
 
@@ -122,7 +124,7 @@ A provider chain, first configured wins:
 |---|---|---|
 | **Anthropic API** | `ANTHROPIC_API_KEY` is set | The real backend. Deployable, and what you want. |
 | **OpenRouter** | `OPENROUTER_API_KEY` is set | For anyone without an Anthropic account. |
-| **Claude Code CLI** | neither is set | Local convenience only. Not deployable — it uses your own interactive login — and roughly 25x more expensive per call, because the CLI injects about 22,000 tokens of its own scaffolding into every request. |
+| **Claude Code CLI** | neither is set | Local convenience only. Not deployable — it uses your own interactive login — and roughly 23x more expensive per call, because the CLI injects about 22,000 tokens of its own scaffolding into every request. |
 
 Cost is small enough to state exactly. A classification is about 420 tokens in and 80 out; a diff
 judgement about 1,600 in and 110 out. On Opus that is roughly $0.004 and $0.011; on Haiku, $0.0008
@@ -139,13 +141,17 @@ workload can still spend. That second risk is what the budget below is for.
 ## Spend control, because the triggers come from strangers
 
 Anyone with a GitHub account can comment on a public repository, and every comment is a potential
-model call. IOU has three ceilings, all failing closed, all overridable by environment variable:
+model call. IOU has three ceilings, all failing closed, all overridable by environment variable —
+but they are not all the same kind of thing, and it is worth being straight about which is which:
 
-| Ceiling | Default | Why |
-|---|---|---|
-| Per actor, per hour | 12 | A judge trying the bot needs a handful. Someone hammering it gets 12, then silence. |
-| Per tick | 20 | One enormous pull request, or a backlog, cannot drain the budget in a single pass. |
-| Lifetime | 2000 | The worst case is a known number, not an open-ended bill. Delete `.iou/budget.json` to reset. |
+| Ceiling | Default | Kind | Why |
+|---|---|---|---|
+| Per actor, per hour | 40 | **Product** | Rate-limiting per commenter is what any bot triggered by strangers needs. Enough that someone can explore it properly; someone hammering it gets 40, then silence. |
+| Per tick | 20 | **Product** | One enormous pull request, or a backlog after downtime, cannot drain the budget in a single pass. |
+| Lifetime | 2000 | **Deployment guard** | Not a product feature. This is a demo running on the author's own key, so the worst case needs to be a known number of pennies rather than an open-ended bill. A real deployment would want a rolling monthly budget and an alert, not a one-way counter that silences the bot permanently and needs `.iou/budget.json` deleted to revive it. |
+
+The first two would survive into production unchanged. The third exists because this particular bot
+is pointed at a public repository with a stranger on the other end and a personal card behind it.
 
 Three details that matter more than the numbers:
 
@@ -196,13 +202,17 @@ project learned the hard way:
 ## Known limitations
 
 See [`LIMITATIONS.md`](LIMITATIONS.md) — written as each shortcut was taken, not afterwards. The
-short version: one repository, one page of results, the model runs through the Claude Code CLI
-rather than the API, and the forced-5xx failure path is tested against a local server because
-GitHub won't return a 500 on request.
+short version: one repository with bounded reads inside it, the Claude Code CLI fallback is local
+convenience only (not deployable, and 23x the cost per call), the judgement is a model's opinion,
+five ledger comments cited by older evidence files were deleted by our own demo staging, and the
+forced-5xx failure path is tested against a local server because GitHub won't return a 500 on
+request.
 
 An unexplained failure is documented in [`BLOCKED.md`](BLOCKED.md) rather than hidden: an early
-live run timed out on every model call. Five theories were raised and all five were measured and
-disproved. It is written down because a build log that only records the wins is not a build log.
+live run timed out on every model call. Four theories were raised and all four were measured and
+disproved; a fifth was named and deliberately not pursued, because chasing it would have been
+grinding without new evidence. It is written down because a build log that only records the wins is
+not a build log — and because "four tested, one declined" is the honest count, not five.
 
 ## How it was built
 

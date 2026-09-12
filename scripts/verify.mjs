@@ -25,10 +25,13 @@ const failures = [];
 // A floor, not a target: if the suite shrinks below this, discovery broke or tests were deleted.
 //
 // This counts IOU's OWN tests only. It was 15 while bare `node --test` was also discovering
-// archive/invite-idea/tests/adapter.test.mjs — the ABANDONED idea's 9 tests. IOU's real suite is
-// 11, which is BELOW the old floor: four IOU tests could have been deleted and this gate would
-// still have read green off a dead project's suite. Discovery is now scoped to tests/ explicitly.
-const MIN_TESTS = 11;
+// archive/invite-idea/tests/adapter.test.mjs — the ABANDONED idea's 9 tests. IOU's real suite was
+// 11, BELOW that floor: four IOU tests could have been deleted and this gate would still have read
+// green off a dead project's suite. Discovery is now scoped to tests/ explicitly.
+//
+// The floor then sat at 11 while 31 tests actually ran, which is the same hole a size smaller —
+// twenty could have gone missing unnoticed. A floor that trails the real count by 3x is decoration.
+const MIN_TESTS = 28;
 
 function step(name, fn) {
   const started = Date.now();
