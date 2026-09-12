@@ -20,6 +20,12 @@ Documentation=https://github.com/devinjones521/iou
 After=network-online.target
 Wants=network-online.target
 
+# Crash-loop brake: 5 failures in 5 minutes and it stays down rather than hammering
+# the API. These are [Unit] directives — in [Service] systemd ignores them with a
+# warning, so the brake looks present and is not. Caught by reading the journal.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
 [Service]
 Type=simple
 User=iou
@@ -29,10 +35,6 @@ EnvironmentFile=/etc/iou/iou.env
 ExecStart=/usr/bin/node src/watch.mjs
 Restart=always
 RestartSec=10
-
-# Crash-loop brake: if it fails 5 times in 5 minutes, stop rather than hammer the API.
-StartLimitIntervalSec=300
-StartLimitBurst=5
 
 # Hardening. The bot reads its code and writes one state directory; it needs nothing else.
 NoNewPrivileges=true
