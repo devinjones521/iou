@@ -8,6 +8,13 @@ when a later PR touches that code without keeping them.**
 > Every engineer has written that. Every reviewer has approved on the strength of it. Nobody tracks
 > them. IOU does — and then stays quiet until the moment it matters.
 
+![IOU noticing a pull request that touches a promise without keeping it](docs/iou-demo.gif)
+
+*Live screen capture, not a mock-up. The comment arrives while the recording is running: the
+service is started mid-take on a pull request it has never seen, and nobody types anything at it.
+Every object in this repository's evidence is real and public —
+[see the ledger](https://github.com/devinjones521/iou-playground/issues/67).*
+
 ---
 
 ## What it does

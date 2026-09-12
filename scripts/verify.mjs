@@ -206,14 +206,33 @@ step("adapter-cap", () => {
 // well past the Stop hook's 60s budget; and while several agent sessions share the one
 // playground repo, concurrent runs interleave their PRs and issues and poison each other's
 // evidence. Opt-out is LOUD — never a silent pass.
+// The "last live run" line used to be HARDCODED PROSE naming the 10:28:43 run. After a genuine
+// 14:50 run it still announced 10:28 — a gate reporting something not derived from reality, which
+// is the same anti-pattern its own comment above names. Read it off evidence/latest.json, and say
+// plainly when there is nothing to read rather than implying a run that never happened.
+function lastLiveRun() {
+  try {
+    const e = JSON.parse(readFileSync(resolve(root, "evidence/latest.json"), "utf8"));
+    const when = e.finished || e.started;
+    const items = Object.keys(e.items || {}).length;
+    if (!when || !items) return null;
+    return { when, items, repo: e.repo, run: e.run };
+  } catch { return null; }
+}
+
 step("live-e2e", () => {
   if (process.env.IOU_LIVE !== "1") {
     note("HELD-OPEN: live e2e NOT RUN in THIS invocation (set IOU_LIVE=1 to run it).");
     note("HELD-OPEN: green below means the FAST checks passed. It is not a claim about the demo");
-    note("HELD-OPEN: path, which only a live run can make. The last live run to complete was");
-    note("HELD-OPEN: 2026-09-12T10:28:43Z: 7/7 assertions green against the real GitHub API,");
-    note("HELD-OPEN: evidence in evidence/live-2026-09-12T10-28-43-679Z.json. That is history,");
-    note("HELD-OPEN: not a statement about the code in front of you now -- re-run it after edits.");
+    note("HELD-OPEN: path, which only a live run can make.");
+    const last = lastLiveRun();
+    if (last) {
+      note(`HELD-OPEN: last live run ${last.when}: ${last.items} demo-path items evidenced`);
+      note(`HELD-OPEN: against the real ${last.repo} API; see evidence/latest.json (${last.run}).`);
+      note("HELD-OPEN: that is history, not a statement about the code in front of you now.");
+    } else {
+      note("HELD-OPEN: NO readable evidence/latest.json -- there is no record of ANY live run.");
+    }
     return null;
   }
   const env = { ...process.env };

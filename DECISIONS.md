@@ -5,6 +5,30 @@ was taken, not reconstructed afterwards.
 
 ---
 
+### The ledger is consulted before recording, not just the local state file
+
+**What:** how the bot avoids recording the same promise twice.
+**Chose:** read the ledger's existing entry ids at the start of every tick and skip any source
+comment already in it, before the budget check so re-reading our own memory never costs a call.
+**Why:** deduplication used to rely on `state.handledComments` in a local file. Observed in
+production: the service was stopped, an end-to-end run took a promise through open → filed →
+settled, and on restart the service — whose state file predated those comments — re-read the source
+comment and recorded the promise again, resurrecting a settled IOU. Local state is exactly what a
+repository-resident ledger is supposed to outlive, so the ledger has to be the authority.
+**Cost:** one extra read per tick. No extra model calls.
+**How to undo:** delete the `alreadyInLedger` block in `src/tick.mjs` and its guard in the comment
+loop. `tests/adapter.test.mjs` covers it and was confirmed to fail without the fix.
+
+### The gate reads the last live run from evidence instead of reciting a date
+
+**What:** the held-open note `npm run verify` prints when the live end-to-end test is not run.
+**Chose:** derive the run, timestamp and item count from `evidence/latest.json`.
+**Why:** the note was hardcoded prose naming one run and kept announcing it after newer runs had
+completed. A gate that reports something not derived from reality is the failure this project keeps
+finding in itself.
+**Cost:** none.
+**How to undo:** replace `lastLiveRun()` in `scripts/verify.mjs` with fixed strings.
+
 ### Model backend is the Claude Code CLI, not the API
 
 **What:** how the bot calls a model.

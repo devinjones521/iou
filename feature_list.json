@@ -16,7 +16,7 @@
       "evidence_required": "GET /repos/{owner}/{repo} returns 200 through the adapter; evidence file names the repo full name",
       "state": "demo-path",
       "passes": true,
-      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.1 — credential app, GET /repos 200 on devinjones521/iou-playground"
+      "evidence": "evidence/live-2026-09-12T15-03-45-426Z.json#items.1 — credential app, GET /repos 200 on devinjones521/iou-playground"
     },
     {
       "id": 2,
@@ -32,7 +32,7 @@
       "evidence_required": "log line with the real comment id; a second tick does not re-handle the same comment",
       "state": "demo-path",
       "passes": true,
-      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.3 — woke on real comment 5645327303, second tick recorded 0"
+      "evidence": "evidence/live-2026-09-12T15-03-45-426Z.json#items.3 — woke on real comment 5646692712, second tick recorded 0"
     },
     {
       "id": 4,
@@ -40,7 +40,7 @@
       "evidence_required": "test name; fixtures include 'I'll never do that' and plain praise, both rejected; malformed model output treated as not-a-promise",
       "state": "demo-path",
       "passes": true,
-      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.4 — promise at confidence 0.95; 2 negatives incl. \"I will never do that\" recorded 0; tests/pure.test.mjs verdictFrom + parseJsonObject"
+      "evidence": "evidence/live-2026-09-12T15-03-45-426Z.json#items.4 — promise at confidence 0.95; 2 negatives recorded 0; tests/pure.test.mjs verdictFrom + parseJsonObject"
     },
     {
       "id": 5,
@@ -48,7 +48,7 @@
       "evidence_required": "ledger issue URL returned by the API and re-fetched",
       "state": "demo-path",
       "passes": true,
-      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.5 — ledger issue /issues/2, entry #issuecomment-5645328113, re-fetched and reduced"
+      "evidence": "evidence/live-2026-09-12T15-03-45-426Z.json#items.5 — ledger issues/67, entry issuecomment-5646693055, re-fetched and reduced"
     },
     {
       "id": 6,
@@ -56,7 +56,7 @@
       "evidence_required": "comment URL returned by the API; the comment body contains the source comment URL",
       "state": "demo-path",
       "passes": true,
-      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.6 — PR 14 comment #issuecomment-5645329938 by devinjones521-iou-bot[bot], links source, second tick resurfaced 0"
+      "evidence": "evidence/live-2026-09-12T15-03-45-426Z.json#items.6 — PR 90 comment issuecomment-5646695956 by devinjones521-iou-bot[bot], links source, second tick resurfaced 0"
     },
     {
       "id": 7,
@@ -64,7 +64,7 @@
       "evidence_required": "comment count on the PR unchanged after a tick; log line quoted in evidence",
       "state": "demo-path",
       "passes": true,
-      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.7 — PR 13 comments 0 before and after; log \"touches none of 1 open IOU(s) — silent\""
+      "evidence": "evidence/live-2026-09-12T15-03-45-426Z.json#items.7 — PR 89 comments 0 before and after; log \"PR #89: touches none of 2 outstanding IOU(s) — silent\""
     },
     {
       "id": 8,
@@ -72,7 +72,7 @@
       "evidence_required": "issue URL; the test asserts no issue exists before the reaction and one exists after",
       "state": "demo-path",
       "passes": true,
-      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.8 — no issue before the reaction; after 👍 issue /issues/15 assigned to devinjones521"
+      "evidence": "evidence/live-2026-09-12T15-03-45-426Z.json#items.8 — no tracking issue before the reaction; after 👍 issue issues/91 assigned to devinjones521"
     },
     {
       "id": 9,
@@ -88,7 +88,7 @@
       "evidence_required": "comment author login ends in [bot], fetched from the API",
       "state": "demo-path",
       "passes": true,
-      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.10 — every bot object authored by devinjones521-iou-bot[bot], distinct from the human"
+      "evidence": "evidence/live-2026-09-12T15-03-45-426Z.json#items.10 — every bot object authored by devinjones521-iou-bot[bot], distinct from the human"
     },
     {
       "id": 11,
@@ -96,7 +96,7 @@
       "evidence_required": "comment URL and the ledger entry marked settled",
       "state": "demo-path",
       "passes": true,
-      "evidence": "evidence/live-2026-09-12T10-59-01-761Z.json#items.11 — PR keeps the promise, one settle comment by the bot, ledger entry settled, no approval requested"
+      "evidence": "evidence/live-2026-09-12T15-03-45-426Z.json#items.11 — PR 92 keeps the promise, one settle comment by the bot, ledger entry settled, approval requested: false"
     }
   ]
 }

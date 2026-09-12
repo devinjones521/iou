@@ -46,6 +46,22 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
     return degrade(err, "ensureLedger", summary, log, state, statePath);
   }
 
+  // The ledger IS the memory — so consult it before recording, not just the local state file.
+  // Observed in production at 14:52 on 12 Sep: the service came back after being stopped, its
+  // state file predated the comments, and it re-recorded a promise the ledger had already carried
+  // through open -> filed -> SETTLED, resurrecting it. `state.handledComments` cannot prevent that,
+  // because the whole point of keeping memory in the repository is that it outlives local state.
+  // Costs one extra read per tick and no model calls; the dedupe happens before any spend.
+  let alreadyInLedger = new Set();
+  try {
+    const prior = await gh.listIssueComments({ since: "2000-01-01T00:00:00Z" });
+    for (const e of reduceLedger(prior.filter((c) => c.issue_url?.endsWith(`/issues/${ledger.number}`)))) {
+      alreadyInLedger.add(e.id);
+    }
+  } catch (err) {
+    return degrade(err, "readLedgerForDedupe", summary, log, state, statePath);
+  }
+
   // ---- 1. wake on new comments ---------------------------------------------------------
   let issueComments = [], reviewComments = [];
   try {
@@ -67,6 +83,13 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
   if (fresh.length === 0) log(`wake: no new comments since ${state.cursor}`);
   for (const c of fresh) {
     log(`wake: comment ${c.id} on PR #${c.prNumber} by @${c.user.login} (${c.kind})`);
+    // Before the budget check, because re-reading our own memory must never cost a model call.
+    if (alreadyInLedger.has(`c${c.id}`)) {
+      log(`  already in the ledger — not recording again`);
+      remember(state.handledComments, c.id);
+      summary.skipped.push({ comment: c.id, actor: c.user.login, reason: "already in the ledger" });
+      continue;
+    }
     const denied = budget.check(c.user.login);
     if (denied) {
       // Deliberately NOT marked handled: the comment is skipped for now, not judged and dismissed.

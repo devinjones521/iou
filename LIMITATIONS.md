@@ -34,6 +34,23 @@ is treated as silence, the bot posts at most one comment per pull request, and n
 without a human reacting 👍. So a wrong judgement costs one comment that a 👎 dismisses — it never
 files anything, and it never edits code.
 
+### Evidence files older than 15:03 cite ledger comments that no longer exist
+
+Every evidence file records real GitHub objects created by a real run; none of it was fabricated.
+But five of the comment URLs the older files cite now 404, because the project deletes them itself:
+`scripts/record.mjs setup` and `scripts/demo.mjs reset` empty the ledger by `DELETE`-ing every
+comment on it, which is how a demo is staged with exactly one open promise. The end-to-end test's
+own teardown does not do this — it closes pull requests and branches and leaves its evidence
+intact — so the loss came from staging a recording hours after those runs.
+
+`feature_list.json` cites `evidence/live-2026-09-12T15-03-45-426Z.json`, whose every URL and
+`#issuecomment-` anchor was checked anonymously against the public playground and returns 200. The
+older files are kept unedited as the historical record rather than quietly rewritten; the dead
+anchors in them are 5645317842, 5645328113, 5645360039, 5645465704 and 5645724654.
+
+The underlying bug is unfixed: stage another recording and it will delete the current evidence too.
+The fix is for staging to close and relabel the old ledger rather than empty it.
+
 ### The playground repository's code is ours
 
 The repository the demo runs against was seeded with two small modules so the pull requests have
