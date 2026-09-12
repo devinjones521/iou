@@ -49,7 +49,10 @@ RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
+# NOT MemoryDenyWriteExecute=true. V8 is a JIT: it maps memory writable and then executable,
+# so that flag makes node die at startup with a SIGTRAP inside v8::base::OS::SetPermissions,
+# before a single line of this program runs. Found by deploying with it on. Every other
+# hardening flag here is compatible with a JIT runtime; this one is not.
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources @obsolete
