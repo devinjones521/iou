@@ -75,7 +75,9 @@ export function openBudget(path = DEFAULT_BUDGET_PATH, limits = LIMITS, now = ()
       }
       const times = budget.actors[login] || [];
       if (times.length >= limits.perActorPerHour) {
-        return `@${login} has used ${times.length}/${limits.perActorPerHour} calls this hour`;
+        // Worded so the number reads correctly even when the count already exceeds the limit —
+        // which happens when the ceiling is lowered mid-run. "2/1 calls" looks like a typo.
+        return `@${login} is over the hourly limit of ${limits.perActorPerHour} call${limits.perActorPerHour === 1 ? "" : "s"} (${times.length} used)`;
       }
       return null;
     },

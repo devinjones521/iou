@@ -12,7 +12,7 @@ const limits = { perActorPerHour: 3, perTick: 5, lifetime: 8 };
 test("per-actor ceiling: one login cannot spend the whole budget", () => {
   const b = openBudget(tmp(), limits);
   for (let i = 0; i < 3; i++) { assert.equal(b.check("attacker"), null); b.spend("attacker"); }
-  assert.match(b.check("attacker"), /3\/3 calls this hour/);
+  assert.match(b.check("attacker"), /over the hourly limit of 3 calls \(3 used\)/);
   assert.equal(b.check("a-judge"), null, "a different person is unaffected");
 });
 
@@ -39,6 +39,19 @@ test("a corrupt budget file fails CLOSED, not open", () => {
   const b = loadBudget(path);
   assert.ok(b.total > 0, "a damaged file must not read as zero spend — that would remove the ceiling");
   assert.match(openBudget(path, limits).check("anyone"), /lifetime budget spent/);
+});
+
+test("the over-limit message reads correctly when the ceiling is lowered mid-run", () => {
+  // Lowering the limit below what an actor already spent is exactly what the video's failure
+  // beat does. The old wording produced "2/1 calls this hour", which reads as a typo.
+  const path = tmp();
+  const first = openBudget(path, { ...limits, perActorPerHour: 5 });
+  for (let i = 0; i < 3; i++) { first.check("dev"); first.spend("dev"); }
+  first.save();
+  const lowered = openBudget(path, { ...limits, perActorPerHour: 1 });
+  const msg = lowered.check("dev");
+  assert.match(msg, /over the hourly limit of 1 call \(3 used\)/, msg);
+  assert.ok(!/\d+\/\d+/.test(msg), `should not render a confusing ratio: ${msg}`);
 });
 
 test("per-actor records older than an hour are pruned", () => {
