@@ -64,8 +64,10 @@ IPAddressAllow=0.0.0.0/0 ::/0
 # The only writable path: where the cursor, handled-comment ids and spend ledger live.
 ReadWritePaths=/opt/iou/.iou
 
-MemoryMax=512M
-TasksMax=64
+# Sized for a small VPS. The bot is one Node process doing HTTP and JSON; it idles
+# around 60-80MB. 256M leaves headroom without being able to starve the host.
+MemoryMax=256M
+TasksMax=32
 
 StandardOutput=journal
 StandardError=journal
