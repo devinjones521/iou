@@ -156,6 +156,50 @@ ${out.slice(0, 1500)}`;
   return null;
 });
 
+// --- 3b. Every named import in src/ actually exists ---------------------------
+// Born from a real outage. `llm.mjs` was changed to export `modelId()` instead of `MODEL`, every
+// test passed, the gate was green, and the deployed service crash-looped on
+// `SyntaxError: The requested module './llm.mjs' does not provide an export named 'MODEL'`
+// — because nothing in tests/ imports watch.mjs, so an entry point can break its own imports and
+// nothing notices until systemd does. `node --check` would not have caught it either: a missing
+// export is a link error, not a syntax error.
+//
+// Static on purpose: importing watch.mjs to check it would start the bot's polling loop.
+step("imports-resolve", () => {
+  const files = sourceFiles(resolve(root, "src"));
+  const exportsOf = new Map();
+  for (const f of files) {
+    const text = readFileSync(f, "utf8");
+    const names = new Set();
+    for (const m of text.matchAll(/^export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z0-9_$]+)/gm)) names.add(m[1]);
+    for (const m of text.matchAll(/^export\s*\{([^}]*)\}/gm)) {
+      for (const part of m[1].split(",")) {
+        const name = part.trim().split(/\s+as\s+/).pop().trim();
+        if (name) names.add(name);
+      }
+    }
+    if (/^export\s+\*/m.test(text)) names.add("*");
+    exportsOf.set(resolve(f), names);
+  }
+  const problems = [];
+  for (const f of files) {
+    for (const m of readFileSync(f, "utf8").matchAll(/import\s*\{([^}]*)\}\s*from\s*["'](\.[^"']+)["']/g)) {
+      const target = resolve(dirname(f), m[2]);
+      const available = exportsOf.get(target);
+      if (!available || available.has("*")) continue;   // not ours, or re-exports everything
+      for (const part of m[1].split(",")) {
+        const name = part.trim().split(/\s+as\s+/)[0].trim();
+        if (name && !available.has(name)) {
+          problems.push(`${relative(root, f)} imports "${name}" from ${m[2]}, which does not export it`);
+        }
+      }
+    }
+  }
+  if (problems.length) return problems.join("\n");
+  note(`${files.length} source files, every named import resolves`);
+  return null;
+});
+
 // --- 4. No invented record URLs ---------------------------------------------
 // Every link the bot posts must be one the GitHub API returned. A fabricated URL in a
 // demo is the most damaging thing a judge can catch. So: no `github.com` literals in
