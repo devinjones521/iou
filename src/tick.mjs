@@ -288,7 +288,7 @@ function degrade(err, stage, summary, log, state, statePath, budget = null) {
   summary.errors.push({ stage, error: err.message, status });
   log(`DEGRADED at ${stage}: ${err.message} — cursor NOT advanced, will retry next tick`);
   saveState(state, statePath);
-  // Spend already made this tick must be banked even when the tick dies. Two of the degrade
+  // Spend already made this tick must be saved even when the tick aborts. Two of the degrade
   // sites below (readLedger, listPulls) run AFTER the classification loop, so without this a
   // failure there quietly forgives up to a full tick of calls against the lifetime ceiling —
   // and the lifetime ceiling is the only one that actually bounds the bill.

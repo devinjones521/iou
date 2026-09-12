@@ -121,7 +121,7 @@ export function openBudget(path = DEFAULT_BUDGET_PATH, caps = limits(), now = ()
 
 /**
  * Text that came out of a model, which came from a stranger's comment, and is about to be posted
- * under the bot's own name. Strip anything that could turn the bot into someone else's megaphone:
+ * under the bot's own name. Strip anything that would let a stranger publish content through it:
  * links, images, @-mentions, issue cross-references, HTML, and fenced blocks. Then cap it.
  *
  * Without this, a comment crafted to make the classifier echo it back gives an attacker
@@ -157,7 +157,7 @@ export function safeLogin(who) {
 /**
  * A URL, only if it is a github.com repository URL — and, when owner/repo are given, only if it is
  * inside that repository. Characters that would break out of a markdown link are rejected outright,
- * so a source can never smuggle in a second link or trailing text.
+ * so a source cannot add a second link or trailing text outside the one the bot intends to post.
  */
 export function safeRepoUrl(url, owner = null, repo = null) {
   const s = String(url ?? "").trim();

@@ -29,8 +29,9 @@ const failures = [];
 // 11, BELOW that floor: four IOU tests could have been deleted and this gate would still have read
 // green off a dead project's suite. Discovery is now scoped to tests/ explicitly.
 //
-// The floor then sat at 11 while 31 tests actually ran, which is the same hole a size smaller —
-// twenty could have gone missing unnoticed. A floor that trails the real count by 3x is decoration.
+// A floor of 11 against 31 actual tests has the same problem in smaller form: twenty tests could
+// be deleted and the gate would still pass. A floor far below the real count does not detect
+// anything, so it is set close to the real count and raised when the suite grows.
 const MIN_TESTS = 28;
 
 function step(name, fn) {
@@ -251,8 +252,8 @@ step("adapter-cap", () => {
 //
 // It is opt-in (IOU_LIVE=1) for two reasons, both recorded in DECISIONS.md: it takes minutes,
 // well past the Stop hook's 60s budget; and while several agent sessions share the one
-// playground repo, concurrent runs interleave their PRs and issues and poison each other's
-// evidence. Opt-out is LOUD — never a silent pass.
+// playground repo, concurrent runs interleave their PRs and issues, so each run's evidence
+// records objects another run created. Opt-out is LOUD — never a silent pass.
 // The "last live run" line used to be HARDCODED PROSE naming the 10:28:43 run. After a genuine
 // 14:50 run it still announced 10:28 — a gate reporting something not derived from reality, which
 // is the same anti-pattern its own comment above names. Read it off evidence/latest.json, and say
