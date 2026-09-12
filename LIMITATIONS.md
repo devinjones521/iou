@@ -67,22 +67,19 @@ is treated as silence, the bot posts at most one comment per pull request, and n
 without a human reacting 👍. A wrong judgement therefore costs one comment that a 👎 dismisses. It
 never files anything and it never edits code.
 
-### Staging a demo deletes ledger comments that older evidence files cite
+### Staging a demo recording clears the ledger
 
-Every evidence file records real GitHub objects created by a real run; none of it is fabricated. But
-five comment URLs in the older files return 404, and the cause is this project's own tooling:
 `scripts/record.mjs setup` and `scripts/demo.mjs reset` empty the ledger by `DELETE`-ing every
-comment on it, which is how the repository is staged to hold exactly one open promise before a
-recording. The end-to-end test's own teardown does not do this — it closes pull requests and
-branches and leaves its evidence intact — so the loss comes from staging a recording after the fact.
+comment on it. That is how the repository is staged to hold exactly one open promise before a
+recording, and it is destructive: an evidence file citing a ledger comment written before a staging
+run will name a URL that no longer exists.
 
-`feature_list.json` cites `evidence/live-2026-09-12T16-37-30-134Z.json`, whose every URL and
-`#issuecomment-` anchor resolves anonymously against the public playground. The older files are kept
-exactly as written rather than quietly repaired; the dead anchors in them are 5645317842,
-5645328113, 5645360039, 5645465704 and 5645724654.
+The end-to-end test's own teardown does not do this — it closes pull requests and branches and
+leaves its evidence intact. `feature_list.json` cites
+`evidence/live-2026-09-12T16-37-30-134Z.json`, and every URL and `#issuecomment-` anchor in it
+resolves anonymously against the public playground.
 
-This is a live bug, not a historical one: staging another recording would delete the current
-evidence too. The fix is for staging to close and relabel the old ledger rather than empty it.
+The fix is for staging to close and relabel the old ledger rather than empty it.
 
 ### The playground repository's code is ours
 
