@@ -3,7 +3,7 @@
 import { github, resolveAuth } from "./github.mjs";
 import { tick } from "./tick.mjs";
 import { loadDotEnv, repoFromEnv, stamp } from "./util.mjs";
-import { backend, MODEL } from "./llm.mjs";
+import { backend, modelId } from "./llm.mjs";
 
 loadDotEnv(); // FIRST: which key is present decides the model backend
 
@@ -15,7 +15,7 @@ const auth = await resolveAuth();
 const gh = github({ owner, repo, token: auth.token, log });
 log(`iou watching ${owner}/${repo}`);
 log(`  github: ${auth.kind} credential${process.env.IOU_BOT_LOGIN ? ` as ${process.env.IOU_BOT_LOGIN}` : ""}`);
-log(`  model:  ${backend()} (${MODEL})`);
+log(`  model:  ${backend()} (${modelId()})`);
 log(`  poll:   every ${interval / 1000}s`);
 
 for (;;) {
