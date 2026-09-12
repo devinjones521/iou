@@ -18,6 +18,7 @@ import { github, resolveAuth } from "../src/github.mjs";
 import { tick } from "../src/tick.mjs";
 import { human } from "../tests/helpers/gh.mjs";
 import { loadDotEnv, repoFromEnv, stamp } from "../src/util.mjs";
+import { retireLedger } from "../src/ledger.mjs";
 
 loadDotEnv();
 
@@ -49,12 +50,9 @@ switch (beat) {
     for (const b of Object.values(BR)) await you.deleteBranch(b);
     const ledger = (await gh.listIssues({ labels: "iou-ledger", state: "all" }))[0];
     if (ledger) {
-      for (const c of await you.commentsOn(ledger.number)) {
-        await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/comments/${c.id}`,
-          { method: "DELETE", headers: { Authorization: `Bearer ${humanToken}`, Accept: "application/vnd.github+json", "User-Agent": "iou-demo" } });
-      }
-      await you.reopenIssue(ledger.number);
-      log(`ledger #${ledger.number} emptied and reopened: ${ledger.html_url}`);
+      // Retire it rather than empty it — see retireLedger in src/ledger.mjs.
+      await retireLedger(you, ledger.number);
+      log(`ledger #${ledger.number} retired — closed and unlabelled, comments intact: ${ledger.html_url}`);
     }
     for (const i of await you.issues("iou")) { await you.closeIssue(i.number); log(`closed tracking issue #${i.number}`); }
     try { (await import("node:fs")).rmSync(STATE, { force: true }); } catch {}

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { parseJsonObject } from "../src/llm.mjs";
 import { verdictFrom } from "../src/classify.mjs";
 import { fulfilmentFrom, touchedIous } from "../src/judge.mjs";
-import { formatEntry, parseEntry, reduceLedger, openIous, ensureLedger } from "../src/ledger.mjs";
+import { formatEntry, parseEntry, reduceLedger, openIous, ensureLedger, retireLedger, LEDGER_LABEL } from "../src/ledger.mjs";
 import { resurfaceBody, settleBody } from "../src/tick.mjs";
 
 test("parseJsonObject: garbage, arrays, prose and fences all fail closed", () => {
@@ -196,4 +196,46 @@ test("a legitimate ledger record still renders the mention and the link", () => 
   assert.ok(body.includes("**@devinjones521 promised:**"), body);
   assert.ok(body.includes("https://github.com/devinjones521/iou-playground/pull/68#issuecomment-1"), body);
   assert.ok(body.includes("PR #70"), body);
+});
+
+
+/**
+ * Staging a demo needs the ledger empty. Deleting its comments achieves that and destroys the
+ * record: evidence files cite individual ledger comments by URL, so a delete turns someone else's
+ * proof into a 404 hours later. Five URLs were lost that way before this existed.
+ *
+ * Retiring closes the issue and strips the label, so ensureLedger opens a fresh one and every old
+ * comment stays readable at its original URL.
+ */
+test("retiring a ledger closes and unlabels it, and deletes nothing", async () => {
+  const calls = [];
+  const you = {
+    updateIssue: (number, patch) => { calls.push({ op: "updateIssue", number, patch }); return {}; },
+    // Present so that a reintroduced delete would be recorded rather than throwing.
+    deleteComment: (id) => { calls.push({ op: "deleteComment", id }); return {}; },
+    commentsOn: () => { calls.push({ op: "commentsOn" }); return []; },
+  };
+
+  await retireLedger(you, 67);
+
+  assert.ok(!calls.some((c) => c.op === "deleteComment"), `must not delete a ledger comment: ${JSON.stringify(calls)}`);
+  assert.ok(!calls.some((c) => c.op === "commentsOn"), `must not even enumerate comments to delete them: ${JSON.stringify(calls)}`);
+  const patch = calls.find((c) => c.op === "updateIssue");
+  assert.ok(patch, `expected the ledger to be updated, got ${JSON.stringify(calls)}`);
+  assert.equal(patch.number, 67);
+  assert.equal(patch.patch.state, "closed", "a retired ledger is closed");
+  assert.deepEqual(patch.patch.labels, [], "the label is stripped so ensureLedger opens a fresh one");
+});
+
+test("a retired ledger is invisible to ensureLedger, which opens a fresh one", async () => {
+  // After retirement the label is gone, so the labelled-issue lookup returns nothing.
+  const created = [];
+  const gh = {
+    listIssues: async () => [],
+    createIssue: async (spec) => { created.push(spec); return { number: 99, html_url: "https://github.com/o/r/issues/99" }; },
+  };
+  const ledger = await ensureLedger(gh, () => {}, null);
+  assert.equal(ledger.number, 99, "a fresh ledger is opened");
+  assert.equal(created.length, 1);
+  assert.ok(created[0].labels.includes(LEDGER_LABEL), `the new ledger carries the label: ${JSON.stringify(created[0].labels)}`);
 });

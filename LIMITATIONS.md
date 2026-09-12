@@ -67,19 +67,20 @@ is treated as silence, the bot posts at most one comment per pull request, and n
 without a human reacting 👍. A wrong judgement therefore costs one comment that a 👎 dismisses. It
 never files anything and it never edits code.
 
-### Staging a demo recording clears the ledger
+### A ledger is retired, not emptied, and the old one stays readable
 
-`scripts/record.mjs setup` and `scripts/demo.mjs reset` empty the ledger by `DELETE`-ing every
-comment on it. That is how the repository is staged to hold exactly one open promise before a
-recording, and it is destructive: an evidence file citing a ledger comment written before a staging
-run will name a URL that no longer exists.
+Staging a demo needs the ledger to hold exactly one open promise. The obvious way to get there is
+to delete every comment on the ledger issue, and that is destructive in a way that is easy to miss:
+the ledger is not only the bot's memory, it is the object evidence files cite by URL as proof that
+a run happened. Deleting a comment turns someone else's record into a 404 long afterwards.
 
-The end-to-end test's own teardown does not do this — it closes pull requests and branches and
-leaves its evidence intact. `feature_list.json` cites
-`evidence/live-2026-09-12T16-37-30-134Z.json`, and every URL and `#issuecomment-` anchor in it
-resolves anonymously against the public playground.
+`scripts/record.mjs setup` and `scripts/demo.mjs reset` therefore close the ledger and strip its
+label instead. `ensureLedger` opens a fresh, empty one on the next tick, and every comment on the
+old ledger stays readable at its original URL. A test asserts that retiring never enumerates or
+deletes a comment, and fails if the delete is reintroduced.
 
-The fix is for staging to close and relabel the old ledger rather than empty it.
+The remaining cost is cosmetic: a repository that has been staged several times accumulates closed,
+unlabelled ledger issues. That is the intended trade — a visible history rather than a silent one.
 
 ### The playground repository's code is ours
 

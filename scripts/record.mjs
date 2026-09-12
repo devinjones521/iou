@@ -16,6 +16,7 @@ import { execFileSync } from "node:child_process";
 import { human } from "../tests/helpers/gh.mjs";
 import { github, resolveAuth } from "../src/github.mjs";
 import { loadDotEnv, repoFromEnv } from "../src/util.mjs";
+import { retireLedger } from "../src/ledger.mjs";
 
 loadDotEnv();
 const { owner, repo } = repoFromEnv();
@@ -60,14 +61,10 @@ switch (cmd) {
     for (const b of Object.values(BR)) await you.deleteBranch(b);
     const ledger = (await gh.listIssues({ labels: "iou-ledger", state: "all" }))[0];
     if (ledger) {
-      for (const c of await you.commentsOn(ledger.number)) {
-        await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/comments/${c.id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${execFileSync("gh", ["auth", "token"], { encoding: "utf8", shell: process.platform === "win32" }).trim()}`, Accept: "application/vnd.github+json", "User-Agent": "iou-video" },
-        });
-      }
-      await you.reopenIssue(ledger.number);
-      console.log(`  ledger #${ledger.number} emptied`);
+      // Retire it rather than empty it. Deleting the comments would give the same clean slate and
+      // silently 404 every evidence file that cites one of them.
+      await retireLedger(you, ledger.number);
+      console.log(`  ledger #${ledger.number} retired — closed and unlabelled, comments intact`);
     }
     for (const i of await you.issues("iou")) { await you.closeIssue(i.number); console.log(`  closed tracking issue #${i.number}`); }
 

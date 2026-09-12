@@ -94,3 +94,19 @@ export const openIous = (ious) => ious.filter((i) => i.status === "open");
  * exists, nagging again adds nothing.
  */
 export const outstandingIous = (ious) => ious.filter((i) => i.status === "open" || i.status === "filed");
+
+/**
+ * Retire a ledger without destroying it: close the issue and strip the label that makes it
+ * findable. `ensureLedger` then opens a fresh, empty one on the next tick.
+ *
+ * This exists because the obvious way to reset a ledger — deleting every comment on it — is
+ * destructive in a way that is easy to miss. The ledger is not only the bot's memory. Evidence
+ * files cite individual ledger comments by URL as proof that a run happened, so deleting a comment
+ * turns someone else's record into a 404 long after the fact. Closing and unlabelling leaves every
+ * comment readable at its original URL forever, and still gives staging the clean slate it needs.
+ *
+ * The caller is responsible for clearing the bot's state file, which remembers the ledger number.
+ */
+export async function retireLedger(you, number) {
+  return you.updateIssue(number, { state: "closed", labels: [] });
+}

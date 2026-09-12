@@ -36,6 +36,7 @@ export function human({ owner, repo, token }) {
     reopenIssue: (number) => call("PATCH", `${R}/issues/${number}`, { state: "open" }),
     closePull: (number) => call("PATCH", `${R}/pulls/${number}`, { state: "closed" }),
     closeIssue: (number) => call("PATCH", `${R}/issues/${number}`, { state: "closed" }),
+    updateIssue: (number, patch) => call("PATCH", `${R}/issues/${number}`, patch),
     deleteBranch: (name) => call("DELETE", `${R}/git/refs/heads/${name}`).catch(() => null),
     me: () => call("GET", `${API}/user`),
   };
