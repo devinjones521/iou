@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { parseJsonObject } from "../src/llm.mjs";
 import { verdictFrom } from "../src/classify.mjs";
 import { fulfilmentFrom, touchedIous } from "../src/judge.mjs";
-import { formatEntry, parseEntry, reduceLedger, openIous } from "../src/ledger.mjs";
+import { formatEntry, parseEntry, reduceLedger, openIous, ensureLedger } from "../src/ledger.mjs";
 import { resurfaceBody, settleBody } from "../src/tick.mjs";
 
 test("parseJsonObject: garbage, arrays, prose and fences all fail closed", () => {
@@ -104,6 +104,37 @@ test("settleBody: marks the PR that kept the promise and asks for nothing", () =
   assert.ok(s.startsWith("<!-- iou:settle"));
   assert.ok(s.includes("https://x/pull/1#issuecomment-1"));
   assert.ok(!s.includes("👍"), "a settled IOU needs no human decision");
+});
+
+test("ensureLedger never creates a second ledger once the number is known", async () => {
+  const calls = [];
+  const gh = {
+    listIssues: async (o) => { calls.push("list"); return []; },
+    createIssue: async () => { calls.push("create"); return { number: 9, html_url: "https://x/issues/9" }; },
+  };
+  const first = await ensureLedger(gh, () => {}, null);
+  assert.equal(first.number, 9);
+  assert.deepEqual(calls, ["list", "create"]);
+  // Second tick, number remembered: no list, no create. This is the whole fix — GitHub's list
+  // endpoint is eventually consistent and briefly did not show an issue we had just made.
+  const second = await ensureLedger(gh, () => {}, 9);
+  assert.equal(second.number, 9);
+  assert.deepEqual(calls, ["list", "create"], "a remembered ledger must cause NO further API calls");
+});
+
+test("ensureLedger picks the OLDEST when duplicates already exist, and says so", async () => {
+  const warnings = [];
+  const gh = {
+    listIssues: async () => ([
+      { number: 51, created_at: "2026-09-12T12:51:24Z" },
+      { number: 50, created_at: "2026-09-12T12:51:17Z" },
+    ]),
+    createIssue: async () => { throw new Error("must not create when ledgers already exist"); },
+  };
+  const led = await ensureLedger(gh, (m) => warnings.push(m), null);
+  assert.equal(led.number, 50, "the oldest holds the history");
+  assert.match(warnings.join("\n"), /2 issues labelled iou-ledger/);
+  assert.match(warnings.join("\n"), /#51/, "it must name the duplicates so a human can close them");
 });
 
 test("ledger: a settled entry reads as kept, not as filed", () => {

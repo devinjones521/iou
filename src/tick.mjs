@@ -34,7 +34,14 @@ export async function tick(gh, { log = console.log, botLogin = process.env.IOU_B
 
   let ledger;
   try {
-    ledger = await ensureLedger(gh, log);
+    ledger = await ensureLedger(gh, log, state.ledgerNumber);
+    // Remember it immediately. Without this, the next tick lists the label again, GitHub's
+    // eventually-consistent list does not yet show the issue we just made, and the bot creates
+    // a SECOND ledger — which actually happened, seven seconds apart.
+    if (state.ledgerNumber !== ledger.number) {
+      state.ledgerNumber = ledger.number;
+      saveState(state, statePath);
+    }
   } catch (err) {
     return degrade(err, "ensureLedger", summary, log, state, statePath);
   }

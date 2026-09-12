@@ -8,10 +8,30 @@ export const LEDGER_LABEL = "iou-ledger";
 export const LEDGER_TITLE = "IOU ledger";
 const MARK = /<!--\s*iou\s+(\{[\s\S]*?\})\s*-->/;
 
-export async function ensureLedger(gh, log) {
-  const issues = await gh.listIssues({ labels: LEDGER_LABEL, state: "all" });
-  const found = issues.find((i) => !i.pull_request);
-  if (found) return found;
+/**
+ * Find the ledger issue, or create it once.
+ *
+ * `remembered` is the issue number from local state, and it is the whole defence against a race
+ * that actually happened: GitHub's issue LIST endpoint is eventually consistent, so a tick that
+ * had just created the ledger listed the label seven seconds later, did not see it, and created
+ * a SECOND one. Two ledgers means the bot's memory splits across them and promises fall down the
+ * gap. Once the number is known we never list again, which also saves an API call every tick.
+ *
+ * If several labelled issues already exist (from exactly that bug), take the OLDEST — it is the
+ * one with the history — and say so, rather than silently picking whichever the API returned first.
+ */
+export async function ensureLedger(gh, log, remembered = null) {
+  if (remembered) return { number: remembered, html_url: null, remembered: true };
+
+  const issues = (await gh.listIssues({ labels: LEDGER_LABEL, state: "all" })).filter((i) => !i.pull_request);
+  if (issues.length > 1) {
+    const oldest = issues.reduce((a, b) => (a.created_at <= b.created_at ? a : b));
+    log(`WARNING: ${issues.length} issues labelled ${LEDGER_LABEL}. Using the oldest (#${oldest.number}); ` +
+        `close the others by hand: ${issues.filter((i) => i.number !== oldest.number).map((i) => "#" + i.number).join(", ")}`);
+    return oldest;
+  }
+  if (issues.length === 1) return issues[0];
+
   const created = await gh.createIssue({
     title: LEDGER_TITLE,
     labels: [LEDGER_LABEL],

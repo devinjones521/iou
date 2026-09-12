@@ -24,6 +24,7 @@ export function saveState(state, path = DEFAULT_STATE_PATH) {
 function fresh() {
   return {
     cursor: new Date(Date.now() - 60_000).toISOString(), // first run: only the last minute
+    ledgerNumber: null,    // the ledger issue, remembered so it is never created twice
     handledComments: [],   // comment ids already classified
     commentedPRs: {},      // prNumber -> [iou ids] already resurfaced there
     pending: [],           // { commentId, prNumber, iouIds } awaiting a reaction
