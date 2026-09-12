@@ -5,49 +5,56 @@ was taken, not reconstructed afterwards.
 
 ---
 
-### The ledger is consulted before recording, not just the local state file
+### The ledger, not local state, decides whether a promise is already recorded
 
 **What:** how the bot avoids recording the same promise twice.
-**Chose:** read the ledger's existing entry ids at the start of every tick and skip any source
-comment already in it, before the budget check so re-reading our own memory never costs a call.
-**Why:** deduplication used to rely on `state.handledComments` in a local file. Observed in
-production: the service was stopped, an end-to-end run took a promise through open → filed →
-settled, and on restart the service — whose state file predated those comments — re-read the source
-comment and recorded the promise again, resurrecting a settled IOU. Local state is exactly what a
-repository-resident ledger is supposed to outlive, so the ledger has to be the authority.
+**Chose:** read the ledger's entry ids at the start of every tick and skip any source comment
+already in it — before the budget check, so re-reading its own memory never costs a model call.
+**Why:** the obvious approach is a list of handled comment ids in the local state file, and it is
+wrong for this product. The whole claim is that the memory lives in the repository and outlives any
+one machine. A state file that is lost, reset, or simply older than the comments it is meant to
+cover leads the bot to re-read a source comment and record a promise the ledger already carried
+through open → filed → settled — resurrecting a promise that was already kept. The ledger has to be
+the authority, because the ledger is the thing that survives.
 **Cost:** one extra read per tick. No extra model calls.
 **How to undo:** delete the `alreadyInLedger` block in `src/tick.mjs` and its guard in the comment
-loop. `tests/adapter.test.mjs` covers it and was confirmed to fail without the fix.
+loop. `tests/adapter.test.mjs` covers it, and that test fails when the guard is removed.
 
-### The gate reads the last live run from evidence instead of reciting a date
+### The gate reads the last live run from evidence, never from a literal
 
-**What:** the held-open note `npm run verify` prints when the live end-to-end test is not run.
-**Chose:** derive the run, timestamp and item count from `evidence/latest.json`.
-**Why:** the note was hardcoded prose naming one run and kept announcing it after newer runs had
-completed. A gate that reports something not derived from reality is the failure this project keeps
-finding in itself.
+**What:** the held-open note `npm run verify` prints when the live end-to-end test has not run.
+**Chose:** derive the run id, timestamp and item count from `evidence/latest.json`, and say plainly
+that there is no record of any live run when that file is missing, malformed, or empty.
+**Why:** a note like this is a claim about reality, and a claim hardcoded as prose goes stale the
+moment the next run completes — announcing an old result with total confidence. A gate that reports
+something it did not derive is the exact failure this project keeps finding in itself.
 **Cost:** none.
 **How to undo:** replace `lastLiveRun()` in `scripts/verify.mjs` with fixed strings.
 
-### Model backend is the Claude Code CLI, not the API
+### The model backend is a provider chain, API first
 
 **What:** how the bot calls a model.
-**Chose:** spawn `claude -p --output-format json` from `src/llm.mjs`.
-**Why:** no API key was available on the build machine, and this is a real model call rather than a
-mock. Measured at roughly 3–7 seconds per call. The demo path makes at most three calls per tick.
-**Cost:** throughput is bounded by the subscription's quota, and when that quota runs out the bot
-goes quiet. That happened once during the build and is recorded in `LIMITATIONS.md`.
-**How to undo:** set `ANTHROPIC_API_KEY` and replace the single `ask` function with the SDK.
+**Chose:** a chain in `src/llm.mjs`, first configured wins — `ANTHROPIC_API_KEY` (the Anthropic
+API), then `OPENROUTER_API_KEY`, then shelling out to `claude -p --output-format json`.
+**Why:** the deployment needs a backend that runs on a server with no interactive login, and anyone
+cloning this repo needs one they can actually use. The CLI stays last because it is genuinely
+useful on a machine with no key at all, and it is a real model call rather than a mock.
+**Cost:** three code paths instead of one. The CLI path is not deployable and costs about 23x more
+per call; `LIMITATIONS.md` measures it. The OpenRouter path has never been exercised.
+**How to undo:** delete `askOpenRouter` and `askCli` and call the SDK directly from `ask`.
 
-### Default model is Opus, not a cheaper one
+### The default model is Opus, not a cheaper one
 
 **What:** which model the bot's own classification and judgement calls use.
-**Chose:** `opus`, overridable with `IOU_MODEL`.
-**Why:** the first draft defaulted to Haiku to spend less of the operator's quota. That is not a
-decision the bot's author should make silently on someone else's behalf — it trades the product's
-accuracy for someone else's budget without telling them. `IOU_MODEL=haiku` exists for iterating.
-Opus also turned out to be *faster* on these prompts in practice.
-**How to undo:** `MODEL` in `src/llm.mjs`.
+**Chose:** `claude-opus-5`, overridable with `IOU_MODEL`.
+**Why:** an earlier draft defaulted to a cheaper model to spend less of the operator's quota. That
+trades the product's accuracy for someone else's budget without telling them, which is not a
+decision to take silently. The spend ceilings are the safety mechanism; a quiet downgrade is not.
+**Cost:** about $0.004 per classification and $0.011 per diff judgement, against roughly a fifth of
+that on Haiku. `IOU_MODEL` must be a full API model id — the bare aliases `opus` and `haiku` are
+Claude Code CLI names and return a 404 from the API, which, because the bot fails closed, looks
+exactly like the bot choosing to stay quiet.
+**How to undo:** set `IOU_MODEL` to a cheaper model id.
 
 ### Wake by polling, not webhooks or GitHub Actions
 
